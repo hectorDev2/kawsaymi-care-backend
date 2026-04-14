@@ -22,6 +22,10 @@ pnpm-debug.log*
 # misc
 .DS_Store
 
+# build output
+/dist
+*.tsbuildinfo
+
 # IDE
 /.idea
 /.vscode
