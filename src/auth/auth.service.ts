@@ -11,7 +11,8 @@ import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
-  private readonly supabase: SupabaseClient;
+  // Keep supabase typing loose to avoid leaking generics across app.
+  private readonly supabase: SupabaseClient<any, any, any>;
 
   constructor(private readonly prisma: PrismaService) {
     this.supabase = createClient(
@@ -83,7 +84,7 @@ export class AuthService {
     return { session: data.session };
   }
 
-  async logout(accessToken: string) {
+  async logout() {
     const { error } = await this.supabase.auth.signOut();
 
     if (error) {
