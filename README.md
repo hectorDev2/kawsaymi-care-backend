@@ -21,15 +21,28 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## Description
+## Descripcion
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Backend de Kawsaymi Care (NestJS + Prisma + Supabase Auth).
 
 ## Project setup
 
 ```bash
 $ npm install
 ```
+
+## Variables de entorno
+
+Requeridas:
+
+```bash
+DATABASE_URL=postgresql://...pooler.supabase.com:5432/postgres
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_ANON_KEY=...
+SUPABASE_JWT_SECRET=...
+```
+
+Nota: los endpoints protegidos validan el `access_token` de Supabase via JWKS.
 
 ## Compile and run the project
 
@@ -43,6 +56,65 @@ $ npm run start:dev
 # production mode
 $ npm run start:prod
 ```
+
+## Auth
+
+Para rutas protegidas usar header:
+
+```bash
+Authorization: Bearer <access_token>
+```
+
+El `access_token` se obtiene desde `POST /auth/login`.
+
+## Endpoints agregados
+
+Semana 2:
+
+Users:
+
+- `GET /users/me`
+- `PUT /users/me`
+- `PUT /users/me/allergies`
+- `PUT /users/me/conditions`
+- `DELETE /users/me`
+
+Medications:
+
+- `GET /medications`
+- `GET /medications/:id`
+- `POST /medications`
+- `PUT /medications/:id`
+- `PATCH /medications/:id/status`
+- `DELETE /medications/:id`
+
+Semana 3 (on-demand, sin scheduler):
+
+Events:
+
+- `GET /events`
+- `GET /events/today`
+- `GET /events/week`
+- `PATCH /events/:id/mark-taken`
+- `PATCH /events/:id/mark-missed`
+
+Adherence:
+
+- `GET /adherence/today`
+- `GET /adherence/week`
+- `GET /adherence/month`
+- `GET /adherence/stats`
+
+Health:
+
+- `GET /health/profile`
+- `POST /health/weight`
+- `GET /health/imc`
+- `GET /health/polypharmacy`
+
+## Events on-demand
+
+`Medication.schedule` se interpreta como lista de datetimes ISO (instantes) y al consultar `today/week` se materializan en DB los `MedicationEvent` faltantes dentro del rango.
 
 ## Run tests
 
