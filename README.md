@@ -1,170 +1,230 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# KAWSAYMI CARE — Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST para gestión de medicamentos, adherencia y cuidado personal.
+Construida con **NestJS 11 + Prisma 7 + Supabase PostgreSQL**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Descripcion
+## Stack
 
-Backend de Kawsaymi Care (NestJS + Prisma + Supabase Auth).
+| Tecnología | Versión | Uso |
+|---|---|---|
+| NestJS | 11 | Framework principal |
+| TypeScript | 5.7 | Lenguaje |
+| Prisma | 7 | ORM |
+| @prisma/adapter-pg | — | Adaptador PostgreSQL (requerido en Prisma 7) |
+| Supabase | — | PostgreSQL + Auth |
+| @supabase/supabase-js | — | Cliente Auth |
+| passport-jwt + jwks-rsa | — | Validación de tokens Supabase |
+| luxon | — | Manejo de fechas y timezones |
+| @nestjs/schedule | — | Cron jobs |
+| @nestjs/swagger | — | Documentación API |
+| class-validator | — | Validación de DTOs |
 
-## Project setup
+---
+
+## Requisitos
+
+- Node.js 20+
+- Cuenta en [Supabase](https://supabase.com)
+
+---
+
+## Instalación
 
 ```bash
-$ npm install
+npm install
 ```
+
+---
 
 ## Variables de entorno
 
-Requeridas:
+Crear un archivo `.env` en la raíz con:
 
-```bash
-DATABASE_URL=postgresql://...pooler.supabase.com:5432/postgres
-SUPABASE_URL=https://<project-ref>.supabase.co
-SUPABASE_ANON_KEY=...
-SUPABASE_JWT_SECRET=...
+```env
+# Supabase — session mode pooler (port 5432, sin pgbouncer)
+# Usar ESTA URL para todo — migrations y runtime
+DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres
+
+# Supabase API
+SUPABASE_URL=https://[PROJECT-REF].supabase.co
+SUPABASE_ANON_KEY=tu-anon-key
+SUPABASE_JWT_SECRET=tu-jwt-secret
 ```
 
-Nota: los endpoints protegidos validan el `access_token` de Supabase via JWKS.
+Los valores se obtienen en **Supabase → Project Settings → API**.
 
-## Compile and run the project
+> **Importante:** Deshabilitar confirmación de email en Supabase → **Authentication → Settings → Email Confirmations** para desarrollo.
+
+---
+
+## Correr el proyecto
 
 ```bash
-# development
-$ npm run start
+# Desarrollo (watch mode)
+npm run start:dev
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+# Producción
+npm run start:prod
 ```
 
-## Auth
+---
 
-Para rutas protegidas usar header:
+## Migrations
 
 ```bash
+npx prisma migrate dev --name <nombre>
+```
+
+---
+
+## Documentación API
+
+Con el servidor corriendo, abrir:
+
+```
+http://localhost:3000/api/docs
+```
+
+Swagger interactivo con todos los endpoints, ejemplos de body y autenticación Bearer.
+
+---
+
+## Autenticación
+
+Todos los endpoints excepto `/auth/register` y `/auth/login` requieren el header:
+
+```
 Authorization: Bearer <access_token>
 ```
 
 El `access_token` se obtiene desde `POST /auth/login`.
 
-## Endpoints agregados
+---
 
-Semana 2:
+## Endpoints
 
-Users:
+### Auth
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/auth/register` | Registrar usuario (email, password, name, role) |
+| POST | `/auth/login` | Login — devuelve access_token y refresh_token |
+| POST | `/auth/refresh` | Refrescar access_token con refresh_token |
+| POST | `/auth/logout` | Cerrar sesión |
 
-- `GET /users/me`
-- `PUT /users/me`
-- `PUT /users/me/allergies`
-- `PUT /users/me/conditions`
-- `DELETE /users/me`
+### Users
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/users/me` | Obtener perfil del usuario autenticado |
+| PUT | `/users/me` | Actualizar nombre, ubicación, idioma, timezone |
+| PUT | `/users/me/allergies` | Actualizar lista de alergias |
+| PUT | `/users/me/conditions` | Actualizar condiciones médicas |
+| DELETE | `/users/me` | Eliminar cuenta y todos los datos |
 
-Medications:
+### Medications
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/medications` | Listar medicamentos del usuario |
+| GET | `/medications/:id` | Detalle de un medicamento |
+| POST | `/medications` | Crear medicamento con horarios de toma |
+| PUT | `/medications/:id` | Actualizar medicamento |
+| PATCH | `/medications/:id/status` | Cambiar estado: ACTIVE / SUSPENDED / COMPLETED |
+| DELETE | `/medications/:id` | Eliminar medicamento y sus eventos |
 
-- `GET /medications`
-- `GET /medications/:id`
-- `POST /medications`
-- `PUT /medications/:id`
-- `PATCH /medications/:id/status`
-- `DELETE /medications/:id`
+### Events
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/events` | Listar eventos con filtros (from, to, medicationId, status) |
+| GET | `/events/today` | Eventos de hoy — genera automáticamente si no existen |
+| GET | `/events/week` | Eventos de la semana — genera automáticamente si no existen |
+| PATCH | `/events/:id/mark-taken` | Marcar evento como tomado |
+| PATCH | `/events/:id/mark-missed` | Marcar evento como omitido |
 
-Semana 3 (on-demand, sin scheduler):
+### Adherence
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/adherence/today` | Adherencia de hoy (taken / missed / pending / %) |
+| GET | `/adherence/week` | Adherencia de la semana |
+| GET | `/adherence/month` | Adherencia del mes |
+| GET | `/adherence/stats` | Stats generales + medicamentos activos |
 
-Events:
+### Health
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/health/profile` | Perfil de salud — crea vacío si no existe |
+| POST | `/health/weight` | Registrar peso en kg — recalcula IMC automáticamente |
+| GET | `/health/imc` | Obtener IMC calculado |
+| GET | `/health/polypharmacy` | Detectar polifarmacia (true si 5+ medicamentos activos) |
 
-- `GET /events`
-- `GET /events/today`
-- `GET /events/week`
-- `PATCH /events/:id/mark-taken`
-- `PATCH /events/:id/mark-missed`
+### Caregivers
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/caregivers/invite` | Invitar cuidador por email |
+| GET | `/caregivers/my-patients` | Listar pacientes (para cuidadores) |
+| GET | `/caregivers/my-caregivers` | Listar cuidadores (para pacientes) |
+| PATCH | `/caregivers/:id/permissions` | Actualizar permisos de la relación |
+| DELETE | `/caregivers/:id` | Eliminar relación cuidador-paciente |
+| GET | `/caregivers/:patientId/alerts` | Alertas del paciente — eventos omitidos últimos 7 días |
 
-Adherence:
+---
 
-- `GET /adherence/today`
-- `GET /adherence/week`
-- `GET /adherence/month`
-- `GET /adherence/stats`
+## Estructura de carpetas
 
-Health:
-
-- `GET /health/profile`
-- `POST /health/weight`
-- `GET /health/imc`
-- `GET /health/polypharmacy`
-
-## Events on-demand
-
-`Medication.schedule` se interpreta como lista de datetimes ISO (instantes) y al consultar `today/week` se materializan en DB los `MedicationEvent` faltantes dentro del rango.
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+```
+src/
+├── auth/
+│   ├── decorators/get-user.decorator.ts
+│   ├── dto/login.dto.ts
+│   ├── dto/refresh.dto.ts
+│   ├── dto/register.dto.ts
+│   ├── guards/jwt-auth.guard.ts
+│   ├── strategies/jwt.strategy.ts
+│   ├── auth.controller.ts
+│   ├── auth.module.ts
+│   └── auth.service.ts
+├── users/
+├── medications/
+├── events/
+├── adherence/
+├── health/
+├── caregivers/
+├── scheduler/
+├── prisma/
+│   ├── prisma.module.ts
+│   └── prisma.service.ts
+├── app.module.ts
+└── main.ts
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Cron jobs (Scheduler)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+| Frecuencia | Tarea |
+|---|---|
+| Diario 00:05 UTC | Genera eventos de medicación para los próximos 30 días |
+| Cada hora | Marca como MISSED todos los eventos PENDING cuya hora ya pasó |
+
+---
+
+## Tests
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Unit tests
+npm run test
+
+# E2E tests
+npm run test:e2e
+
+# Coverage
+npm run test:cov
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## Deploy
 
-Check out a few resources that may come in handy when working with NestJS:
+Plataformas recomendadas: **Railway** o **Fly.io**.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Asegurarse de configurar las variables de entorno en la plataforma elegida antes de deployar.
