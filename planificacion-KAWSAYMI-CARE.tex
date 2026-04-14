@@ -1,0 +1,1004 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{colortbl}
+\usepackage{multicol}
+\usepackage{listings}
+\usepackage{tikz}
+\usepackage{enumerate}
+
+\geometry{left=2.5cm, right=2.5cm, top=3cm, bottom=2.5cm}
+
+\definecolor{primaryblue}{RGB}{0,102,204}
+\definecolor{darkblue}{RGB}{0,51,102}
+\definecolor{lightblue}{RGB}{230,242,255}
+\definecolor{accentgreen}{RGB}{52,168,83}
+\definecolor{darktext}{RGB}{51,51,51}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primaryblue,
+    urlcolor=primaryblue,
+    citecolor=primaryblue
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\textcolor{primaryblue}{\textbf{KAWSAYMI CARE}}}
+\rhead{\textcolor{darktext}{Backend - NestJS}}
+\cfoot{\textcolor{darktext}{Página \thepage\ de \pageref{LastPage}}}
+\renewcommand{\headrulewidth}{1.5pt}
+\renewcommand{\headrule}{\color{primaryblue}\hrule}
+
+\usepackage{titlesec}
+\titleformat{\section}{\Large\bfseries\color{primaryblue}}{}{0pt}{}[\color{primaryblue}\titlerule]
+\titleformat{\subsection}{\large\bfseries\color{darkblue}}{}{0pt}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{darktext}}{}{0pt}{}
+
+\title{
+    \vspace{-2cm}
+    \huge\textbf{\color{primaryblue}KAWSAYMI CARE}\\
+    \Large\color{darkblue}Planificación de Construcción - Backend\\
+    \normalsize\color{darktext}NestJS + Supabase + PostgreSQL
+}
+\author{Equipo de Desarrollo Backend}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+\vspace{1cm}
+
+\begin{center}
+    \boxed{\begin{minipage}{0.9\textwidth}
+        \centering
+        \textbf{\textcolor{primaryblue}{PLANIFICACIÓN DETALLADA DEL BACKEND}}\\[0.5cm]
+        Este documento presenta la estructura, módulos, endpoints, base de datos\\
+        y plan de construcción del backend con NestJS en 4 semanas.
+    \end{minipage}}
+\end{center}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ============================================
+\section{1. ARQUITECTURA DEL BACKEND}
+% ============================================
+
+\subsection{1.1 Stack Tecnológico}
+
+\begin{itemize}
+    \item \textbf{Framework:} NestJS 10.x con TypeScript
+    \item \textbf{Base de Datos:} Supabase PostgreSQL
+    \item \textbf{ORM:} Prisma
+    \item \textbf{Autenticación:} Supabase Auth + JWT
+    \item \textbf{Validación:} class-validator + class-transformer
+    \item \textbf{Scheduler:} @nestjs/schedule (node-cron)
+    \item \textbf{Logging:} @nestjs/common + Winston
+    \item \textbf{Testing:} Jest
+    \item \textbf{Deploy:} Railway / Fly.io
+\end{itemize}
+
+\subsection{1.2 Estructura de Carpetas}
+
+\begin{verbatim}
+src/
+├── auth/
+│   ├── auth.controller.ts
+│   ├── auth.service.ts
+│   ├── auth.module.ts
+│   ├── strategies/
+│   │   └── jwt.strategy.ts
+│   └── guards/
+│       └── jwt.guard.ts
+├── users/
+│   ├── users.controller.ts
+│   ├── users.service.ts
+│   ├── users.module.ts
+│   └── dto/
+│       ├── create-user.dto.ts
+│       └── update-user.dto.ts
+├── medications/
+│   ├── medications.controller.ts
+│   ├── medications.service.ts
+│   ├── medications.module.ts
+│   └── dto/
+├── events/
+│   ├── events.controller.ts
+│   ├── events.service.ts
+│   ├── events.module.ts
+│   └── dto/
+├── adherence/
+│   ├── adherence.controller.ts
+│   ├── adherence.service.ts
+│   ├── adherence.module.ts
+│   └── dto/
+├── caregivers/
+│   ├── caregivers.controller.ts
+│   ├── caregivers.service.ts
+│   ├── caregivers.module.ts
+│   └── dto/
+├── health/
+│   ├── health.controller.ts
+│   ├── health.service.ts
+│   └── health.module.ts
+├── scheduler/
+│   ├── scheduler.service.ts
+│   └── scheduler.module.ts
+├── prisma/
+│   └── prisma.service.ts
+├── common/
+│   ├── decorators/
+│   ├── filters/
+│   ├── interceptors/
+│   └── pipes/
+├── config/
+│   └── database.config.ts
+├── app.module.ts
+└── main.ts
+\end{verbatim}
+
+\subsection{1.3 Principios de Arquitectura}
+
+\begin{enumerate}
+    \item \textbf{Modular:} Cada funcionalidad es un módulo independiente
+    \item \textbf{Layered:} Separación clara entre controller, service, repository
+    \item \textbf{Type-Safe:} TypeScript en todo el stack
+    \item \textbf{Testeable:} Inyección de dependencias para facilitar testing
+    \item \textbf{Scalable:} Preparado para crecer sin refactoring mayor
+\end{enumerate}
+
+% ============================================
+\section{2. MÓDULOS DEL BACKEND}
+% ============================================
+
+\subsection{2.1 Auth Module}
+
+\subsubsection{Responsabilidades}
+\begin{itemize}
+    \item Registro de usuarios (paciente/cuidador)
+    \item Autenticación con Supabase Auth
+    \item Generación de JWT tokens
+    \item Refresh tokens
+    \item Logout
+\end{itemize}
+
+\subsubsection{Endpoints}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{lightblue}
+\textbf{Método} & \textbf{Endpoint} & \textbf{Descripción} \\
+\hline
+POST & /auth/register & Registrar nuevo usuario \\
+\hline
+POST & /auth/login & Login con email y contraseña \\
+\hline
+POST & /auth/login-oauth & Login con OAuth (Google, Apple) \\
+\hline
+POST & /auth/refresh & Refrescar JWT token \\
+\hline
+POST & /auth/logout & Logout (invalidar token) \\
+\hline
+POST & /auth/forgot-password & Solicitar reset de contraseña \\
+\hline
+POST & /auth/reset-password & Confirmar reset de contraseña \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsubsection{Modelos (Prisma)}
+
+\begin{verbatim}
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  role          Role
+  name          String
+  dateOfBirth   DateTime?
+  location      String?
+  language      String      @default("es")
+  timezone      String      @default("UTC")
+  allergies     String[]
+  conditions    String[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  medications   Medication[]
+  events        MedicationEvent[]
+  caregivers    CaregiverRelation[]
+  health        HealthData?
+}
+
+enum Role {
+  PATIENT
+  CAREGIVER
+}
+\end{verbatim}
+
+\subsection{2.2 Users Module}
+
+\subsubsection{Responsabilidades}
+\begin{itemize}
+    \item CRUD de perfil de usuario
+    \item Actualizar datos personales
+    \item Gestionar alergias y condiciones
+    \item Preferencias de usuario
+\end{itemize}
+
+\subsubsection{Endpoints}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{lightblue}
+\textbf{Método} & \textbf{Endpoint} & \textbf{Descripción} \\
+\hline
+GET & /users/me & Obtener perfil del usuario actual \\
+\hline
+PUT & /users/me & Actualizar perfil \\
+\hline
+PUT & /users/me/allergies & Actualizar alergias \\
+\hline
+PUT & /users/me/conditions & Actualizar condiciones médicas \\
+\hline
+DELETE & /users/me & Eliminar cuenta (soft delete) \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{2.3 Medications Module}
+
+\subsubsection{Responsabilidades}
+\begin{itemize}
+    \item CRUD de medicamentos
+    \item Generación automática de eventos
+    \item Gestión de estados (activo, completado, suspendido)
+    \item Validación de dosis y frecuencia
+\end{itemize}
+
+\subsubsection{Endpoints}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{lightblue}
+\textbf{Método} & \textbf{Endpoint} & \textbf{Descripción} \\
+\hline
+GET & /medications & Listar medicamentos del usuario \\
+\hline
+GET & /medications/:id & Obtener detalles de medicamento \\
+\hline
+POST & /medications & Crear nuevo medicamento \\
+\hline
+PUT & /medications/:id & Actualizar medicamento \\
+\hline
+PATCH & /medications/:id/status & Cambiar estado (activo/suspendido) \\
+\hline
+DELETE & /medications/:id & Eliminar medicamento \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsubsection{Modelos (Prisma)}
+
+\begin{verbatim}
+model Medication {
+  id              String      @id @default(cuid())
+  userId          String
+  name            String
+  dose            String
+  frequency       Int
+  intervalHours   Int
+  instructions    String?
+  startDate       DateTime
+  endDate         DateTime?
+  status          MedStatus   @default(ACTIVE)
+  schedule        String[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  user            User        @relation(fields: [userId], references: [id])
+  events          MedicationEvent[]
+}
+
+enum MedStatus {
+  ACTIVE
+  COMPLETED
+  SUSPENDED
+}
+\end{verbatim}
+
+\subsection{2.4 Events Module}
+
+\subsubsection{Responsabilidades}
+\begin{itemize}
+    \item Generación de eventos automáticos
+    \item Actualización de estado (taken, missed, pending)
+    \item Consulta de eventos por fecha/rango
+\end{itemize}
+
+\subsubsection{Endpoints}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{lightblue}
+\textbf{Método} & \textbf{Endpoint} & \textbf{Descripción} \\
+\hline
+GET & /events & Listar eventos (con filtros) \\
+\hline
+GET & /events/today & Eventos de hoy \\
+\hline
+GET & /events/week & Eventos de esta semana \\
+\hline
+PATCH & /events/:id/mark-taken & Marcar como tomado \\
+\hline
+PATCH & /events/:id/mark-missed & Marcar como omitido \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsubsection{Modelo (Prisma)}
+
+\begin{verbatim}
+model MedicationEvent {
+  id                String      @id @default(cuid())
+  medicationId      String
+  userId            String
+  dateTimeScheduled DateTime
+  status            EventStatus @default(PENDING)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  medication        Medication  @relation(fields: [medicationId], references: [id])
+  user              User        @relation(fields: [userId], references: [id])
+}
+
+enum EventStatus {
+  PENDING
+  TAKEN
+  MISSED
+}
+\end{verbatim}
+
+\subsection{2.5 Adherence Module}
+
+\subsubsection{Responsabilidades}
+\begin{itemize}
+    \item Cálculo de adherencia (%)
+    \item Agregación por período (día, semana, mes)
+    \item Alertas por baja adherencia
+    \item Reportes longitudinales
+\end{itemize}
+
+\subsubsection{Endpoints}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{lightblue}
+\textbf{Método} & \textbf{Endpoint} & \textbf{Descripción} \\
+\hline
+GET & /adherence/today & Adherencia de hoy \\
+\hline
+GET & /adherence/week & Adherencia semanal \\
+\hline
+GET & /adherence/month & Adherencia mensual \\
+\hline
+GET & /adherence/stats & Estadísticas generales \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsubsection{Cálculo de Adherencia}
+
+\begin{verbatim}
+adherence_percentage = (taken_events / total_events) * 100
+
+Reglas:
+- Si 2+ eventos consecutivos omitidos → ALERT
+- Si adherence < 60% → ALERT
+- Si adherence >= 80% → GOOD
+\end{verbatim}
+
+\subsection{2.6 Caregivers Module}
+
+\subsubsection{Responsabilidades}
+\begin{itemize}
+    \item Crear relaciones paciente-cuidador
+    \item Gestionar permisos (read, notify)
+    \item Generar alertas para cuidadores
+    \item Dashboard del cuidador
+\end{itemize}
+
+\subsubsection{Endpoints}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{lightblue}
+\textbf{Método} & \textbf{Endpoint} & \textbf{Descripción} \\
+\hline
+POST & /caregivers/invite & Invitar cuidador \\
+\hline
+GET & /caregivers/my-patients & Listar mis pacientes (cuidador) \\
+\hline
+GET & /caregivers/my-caregivers & Listar mis cuidadores (paciente) \\
+\hline
+PATCH & /caregivers/:id/permissions & Actualizar permisos \\
+\hline
+DELETE & /caregivers/:id & Eliminar relación \\
+\hline
+GET & /caregivers/:patientId/alerts & Alertas del paciente \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{2.7 Health Module}
+
+\subsubsection{Responsabilidades}
+\begin{itemize}
+    \item Gestionar peso, talla, IMC
+    \item Hábitos: sueño, ejercicio, hidratación
+    \item Detección de polifarmacia
+    \item Interacciones medicamento-condición
+\end{itemize}
+
+\subsubsection{Endpoints}
+
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\rowcolor{lightblue}
+\textbf{Método} & \textbf{Endpoint} & \textbf{Descripción} \\
+\hline
+GET & /health/profile & Obtener perfil de salud \\
+\hline
+POST & /health/weight & Registrar peso \\
+\hline
+GET & /health/imc & Calcular y obtener IMC \\
+\hline
+GET & /health/polypharmacy & Detectar polifarmacia \\
+\hline
+GET & /health/interactions & Verificar interacciones \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection{2.8 Scheduler Module}
+
+\subsubsection{Responsabilidades}
+\begin{itemize}
+    \item Generar eventos automáticamente cada día
+    \item Enviar notificaciones push en horarios
+    \item Limpiar eventos antiguos
+    \item Generar reportes periódicos
+\end{itemize}
+
+\subsubsection{Tareas Programadas}
+
+\begin{verbatim}
+// Cada día a las 00:00 UTC
+- Generar eventos para próximos 30 días
+
+// Cada medicamento a su hora
+- Enviar notificación push (FCM)
+
+// Cada semana (lunes 00:00 UTC)
+- Generar reporte de adherencia
+
+// Cada mes (1° a las 00:00 UTC)
+- Generar estadísticas y trends
+\end{verbatim}
+
+% ============================================
+\section{3. BASE DE DATOS - DIAGRAMA COMPLETO}
+% ============================================
+
+\subsection{3.1 Modelo Entidad-Relación}
+
+\begin{verbatim}
+┌─────────────────┐
+│   User          │
+├─────────────────┤
+│ id (PK)         │
+│ email           │
+│ role            │
+│ name            │
+│ dateOfBirth     │
+│ location        │
+│ conditions[]    │
+│ allergies[]     │
+└─────────────────┘
+        │
+        ├──────────→ Medication (1:N)
+        ├──────────→ MedicationEvent (1:N)
+        ├──────────→ HealthData (1:1)
+        └──────────→ CaregiverRelation (1:N)
+
+┌──────────────────┐
+│   Medication     │
+├──────────────────┤
+│ id (PK)          │
+│ userId (FK)      │
+│ name             │
+│ dose             │
+│ frequency        │
+│ intervalHours    │
+│ status           │
+│ schedule[]       │
+└──────────────────┘
+        │
+        └──────────→ MedicationEvent (1:N)
+
+┌──────────────────────┐
+│   MedicationEvent    │
+├──────────────────────┤
+│ id (PK)              │
+│ medicationId (FK)    │
+│ userId (FK)          │
+│ dateTimeScheduled    │
+│ status               │
+└──────────────────────┘
+
+┌────────────────────┐
+│   HealthData       │
+├────────────────────┤
+│ id (PK)            │
+│ userId (FK)        │
+│ weight             │
+│ height             │
+│ imc                │
+│ sleep_hours        │
+│ exercise_minutes   │
+│ water_liters       │
+└────────────────────┘
+
+┌────────────────────────┐
+│   CaregiverRelation    │
+├────────────────────────┤
+│ patientId (FK)         │
+│ caregiverId (FK)       │
+│ permissions[]          │
+│ createdAt              │
+└────────────────────────┘
+\end{verbatim}
+
+% ============================================
+\section{4. PLAN DE CONSTRUCCIÓN - 4 SEMANAS}
+% ============================================
+
+\subsection{4.1 SEMANA 1: Setup + Auth Module}
+
+\subsubsection{Lunes-Martes: Infrastructure}
+\begin{itemize}
+    \item Crear proyecto NestJS
+    \item Configurar Supabase y PostgreSQL
+    \item Setup de Prisma
+    \item Configurar variables de entorno
+    \item CI/CD con GitHub Actions (básico)
+\end{itemize}
+
+\subsubsection{Miércoles-Viernes: Auth Module}
+\begin{itemize}
+    \item Crear AuthController y AuthService
+    \item Implementar JWT Strategy
+    \item Endpoints: register, login, logout
+    \item Proteger rutas con @UseGuards(JwtAuthGuard)
+    \item Testing unitario de Auth
+\end{itemize}
+
+\subsubsection{Entregables}
+\begin{itemize}
+    \item Proyecto con estructura base
+    \item Auth completamente funcional
+    \item Usuarios pueden registrarse y loguearse
+\end{itemize}
+
+\subsection{4.2 SEMANA 2: Users + Medications Module}
+
+\subsubsection{Lunes-Martes: Users Module}
+\begin{itemize}
+    \item CRUD de perfil de usuario
+    \item Gestión de alergias y condiciones
+    \item Endpoints GET/PUT /users/me
+    \item Validaciones de datos
+    \item Tests unitarios
+\end{itemize}
+
+\subsubsection{Miércoles-Viernes: Medications Module}
+\begin{itemize}
+    \item CRUD de medicamentos
+    \item Validación de dosis y frecuencia
+    \item Generación automática de eventos
+    \item Endpoints de medicamentos
+    \item Tests unitarios
+\end{itemize}
+
+\subsubsection{Entregables}
+\begin{itemize}
+    \item Usuarios pueden actualizar su perfil
+    \item CRUD de medicamentos funcional
+    \item Eventos se generan automáticamente
+\end{itemize}
+
+\subsection{4.3 SEMANA 3: Events + Adherence + Health}
+
+\subsubsection{Lunes: Events Module}
+\begin{itemize}
+    \item CRUD de eventos
+    \item Mark as taken/missed
+    \item Filtros por fecha
+    \item Tests
+\end{itemize}
+
+\subsubsection{Martes-Miércoles: Adherence Module}
+\begin{itemize}
+    \item Cálculo de adherencia
+    \item Agregación por período
+    \item Alertas automáticas
+    \item Endpoint de estadísticas
+    \item Tests
+\end{itemize}
+
+\subsubsection{Jueves-Viernes: Health Module}
+\begin{itemize}
+    \item CRUD de health data
+    \item Cálculo de IMC
+    \item Detección de polifarmacia
+    \item Verificación de interacciones
+    \item Tests
+\end{itemize}
+
+\subsubsection{Entregables}
+\begin{itemize}
+    \item Sistema de eventos completo
+    \item Cálculo de adherencia funcionando
+    \item Health data y análisis
+\end{itemize}
+
+\subsection{4.4 SEMANA 4: Caregivers + Scheduler + Testing}
+
+\subsubsection{Lunes-Martes: Caregivers Module}
+\begin{itemize}
+    \item Crear relaciones paciente-cuidador
+    \item Gestionar permisos
+    \item Dashboard del cuidador
+    \item Alertas para cuidadores
+    \item Tests
+\end{itemize}
+
+\subsubsection{Miércoles: Scheduler Module}
+\begin{itemize}
+    \item Setup de node-cron
+    \item Generación de eventos automática
+    \item Scheduler de notificaciones
+    \item Limpieza de datos antiguos
+    \item Tests
+\end{itemize}
+
+\subsubsection{Jueves-Viernes: Testing + Polish}
+\begin{itemize}
+    \item Testing E2E de flujos principales
+    \item Integration tests
+    \item Bug fixes
+    \item Documentación con Swagger
+    \item Deploy a staging
+\end{itemize}
+
+\subsubsection{Entregables}
+\begin{itemize}
+    \item Backend completamente funcional
+    \item Todos los módulos integrados
+    \item Testing > 80\% coverage
+    \item Documentación API (Swagger)
+    \item Listo para producción
+\end{itemize}
+
+% ============================================
+\section{5. ENDPOINTS COMPLETOS}
+% ============================================
+
+\subsection{5.1 Auth Endpoints}
+
+\begin{verbatim}
+POST /auth/register
+Body: { email, password, name, role }
+Response: { user, token, refreshToken }
+
+POST /auth/login
+Body: { email, password }
+Response: { user, token, refreshToken }
+
+POST /auth/refresh
+Headers: { Authorization: Bearer <token> }
+Response: { token, refreshToken }
+
+POST /auth/logout
+Headers: { Authorization: Bearer <token> }
+Response: { success: true }
+\end{verbatim}
+
+\subsection{5.2 Users Endpoints}
+
+\begin{verbatim}
+GET /users/me
+Headers: { Authorization: Bearer <token> }
+Response: { id, email, name, role, ... }
+
+PUT /users/me
+Body: { name, location, timezone, language }
+Response: { updated user }
+
+PUT /users/me/conditions
+Body: { conditions: [string] }
+Response: { conditions }
+
+PUT /users/me/allergies
+Body: { allergies: [string] }
+Response: { allergies }
+\end{verbatim}
+
+\subsection{5.3 Medications Endpoints}
+
+\begin{verbatim}
+GET /medications
+Query: { status?, skip?, take? }
+Response: [{ id, name, dose, frequency, ... }]
+
+POST /medications
+Body: { name, dose, frequency, intervalHours, schedule, ... }
+Response: { created medication }
+
+PUT /medications/:id
+Body: { name?, dose?, frequency?, ... }
+Response: { updated medication }
+
+PATCH /medications/:id/status
+Body: { status: "ACTIVE" | "SUSPENDED" | "COMPLETED" }
+Response: { medication with new status }
+
+DELETE /medications/:id
+Response: { success: true }
+\end{verbatim}
+
+\subsection{5.4 Events Endpoints}
+
+\begin{verbatim}
+GET /events
+Query: { dateFrom?, dateTo?, medicationId?, status? }
+Response: [{ id, status, dateTimeScheduled, ... }]
+
+GET /events/today
+Response: [events for today]
+
+GET /events/week
+Response: [events for this week]
+
+PATCH /events/:id/mark-taken
+Body: { timeMarked?: DateTime }
+Response: { event with status=TAKEN }
+
+PATCH /events/:id/mark-missed
+Response: { event with status=MISSED }
+\end{verbatim}
+
+% ============================================
+\section{6. CONVENCIONES Y ESTÁNDARES}
+% ============================================
+
+\subsection{6.1 Nombres}
+
+\begin{itemize}
+    \item \textbf{Controllers:} PascalCase + Controller
+    \item \textbf{Services:} PascalCase + Service
+    \item \textbf{Modules:} PascalCase + Module
+    \item \textbf{DTOs:} PascalCase + Dto
+    \item \textbf{Métodos:} camelCase
+    \item \textbf{Variables:} camelCase
+\end{itemize}
+
+\subsection{6.2 Validaciones}
+
+\begin{verbatim}
+// DTOs deben tener validaciones
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+
+export class CreateUserDto {
+  @IsEmail()
+  email: string;
+
+  @IsNotEmpty()
+  @IsString()
+  password: string;
+
+  @IsNotEmpty()
+  @IsString()
+  name: string;
+}
+\end{verbatim}
+
+\subsection{6.3 Manejo de Errores}
+
+\begin{verbatim}
+// Usar excepciones de NestJS
+throw new BadRequestException('Invalid input');
+throw new UnauthorizedException('Not authenticated');
+throw new NotFoundException('Resource not found');
+throw new ConflictException('Resource already exists');
+throw new InternalServerErrorException('Server error');
+\end{verbatim}
+
+\subsection{6.4 Logging}
+
+\begin{verbatim}
+// Usar logger de NestJS
+private readonly logger = new Logger(MedicationsService.name);
+
+this.logger.log('Medication created: ' + id);
+this.logger.error('Error creating medication', error);
+this.logger.warn('Low adherence detected');
+\end{verbatim}
+
+% ============================================
+\section{7. TESTING STRATEGY}
+% ============================================
+
+\subsection{7.1 Unit Tests}
+
+\begin{itemize}
+    \item Cada service debe tener tests
+    \item Mock de dependencias con jest.mock()
+    \item Coverage mínimo: 80\%
+    \item Archivo: \texttt{service.spec.ts}
+\end{itemize}
+
+\subsection{7.2 Integration Tests}
+
+\begin{itemize}
+    \item Pruebas E2E de flujos principales
+    \item Usar TestingModule de NestJS
+    \item Pruebas con BD real (test database)
+    \item Coverage de endpoints críticos
+\end{itemize}
+
+\subsection{7.3 Ejecución de Tests}
+
+\begin{verbatim}
+# Tests unitarios
+npm run test
+
+# Tests E2E
+npm run test:e2e
+
+# Coverage
+npm run test:cov
+\end{verbatim}
+
+% ============================================
+\section{8. DEPLOYMENT Y PRODUCCIÓN}
+% ============================================
+
+\subsection{8.1 Preparación}
+
+\begin{itemize}
+    \item Build del proyecto: \texttt{npm run build}
+    \item Variables de entorno en producción
+    \item Logs y monitoreo configurados
+    \item Database backups automáticos en Supabase
+\end{itemize}
+
+\subsection{8.2 Deploy a Railway/Fly.io}
+
+\begin{verbatim}
+# Railway
+railway link
+railway up
+
+# Fly.io
+flyctl launch
+flyctl deploy
+\end{verbatim}
+
+\subsection{8.3 Monitoreo}
+
+\begin{itemize}
+    \item \textbf{Logs:} Supabase logs + Winston
+    \item \textbf{Errores:} Sentry integration
+    \item \textbf{Performance:} Railway/Fly.io dashboards
+    \item \textbf{Uptime:} Status page
+\end{itemize}
+
+% ============================================
+\section{9. SEGURIDAD}
+% ============================================
+
+\subsection{9.1 Autenticación}
+
+\begin{itemize}
+    \item JWT tokens firmados con secret
+    \item Refresh tokens con expiración
+    \item Supabase Auth para OAuth2
+\end{itemize}
+
+\subsection{9.2 Autorización}
+
+\begin{itemize}
+    \item Guards para proteger endpoints
+    \item RLS (Row Level Security) en Supabase
+    \item Validar que usuario solo acceda sus datos
+\end{itemize}
+
+\subsection{9.3 Datos Sensibles}
+
+\begin{itemize}
+    \item Hashing de contraseñas con bcrypt (manejado por Supabase)
+    \item Encriptación en tránsito (HTTPS)
+    \item Encriptación en reposo en Supabase
+\end{itemize}
+
+% ============================================
+\section{10. DOCUMENTACIÓN}
+% ============================================
+
+\subsection{10.1 Swagger/OpenAPI}
+
+\begin{verbatim}
+import { NestFactory } = from '@nestjs/core';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  
+  const config = new DocumentBuilder()
+    .setTitle('KAWSAYMI CARE API')
+    .setDescription('API Backend')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+    
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
+
+  await app.listen(3000);
+}
+
+bootstrap();
+\end{verbatim}
+
+\subsection{10.2 README}
+
+\begin{itemize}
+    \item Guía de instalación
+    \item Variables de entorno (.env.example)
+    \item Cómo ejecutar en local
+    \item Estructura de carpetas
+    \item Cómo contribuir
+\end{itemize}
+
+\vspace{2cm}
+
+\begin{center}
+    \boxed{\begin{minipage}{0.8\textwidth}
+        \centering
+        \textbf{\textcolor{primaryblue}{Backend sólido, escalable y mantenible.}}\\
+        \vspace{0.3cm}
+        \textit{Con NestJS + Supabase, el MVP está preparado\\
+        para escalar a millones de eventos.}
+    \end{minipage}}
+\end{center}
+
+\end{document}
