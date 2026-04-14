@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------
+// Models
+// ---------------------------------------------------------
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  role        Role
+  name        String
+  dateOfBirth DateTime?
+  location    String?
+  language    String   @default("es")
+  timezone    String   @default("UTC")
+  allergies   String[]
+  conditions  String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  medications        Medication[]
+  events             MedicationEvent[]
+  health             HealthData?
+  patientRelations   CaregiverRelation[] @relation("PatientRelations")
+  caregiverRelations CaregiverRelation[] @relation("CaregiverRelations")
+}
+
+model Medication {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  dose          String
+  frequency     Int
+  intervalHours Int
+  instructions  String?
+  startDate     DateTime
+  endDate       DateTime?
+  status        MedStatus @default(ACTIVE)
+  schedule      String[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events MedicationEvent[]
+}
+
+model MedicationEvent {
+  id                String      @id @default(cuid())
+  medicationId      String
+  userId            String
+  dateTimeScheduled DateTime
+  status            EventStatus @default(PENDING)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  medication Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model HealthData {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  weight          Float?
+  height          Float?
+  imc             Float?
+  sleepHours      Float?
+  exerciseMinutes Int?
+  waterLiters     Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CaregiverRelation {
+  id          String   @id @default(cuid())
+  patientId   String
+  caregiverId String
+  permissions String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  patient   User @relation("PatientRelations", fields: [patientId], references: [id], onDelete: Cascade)
+  caregiver User @relation("CaregiverRelations", fields: [caregiverId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, caregiverId])
+}
+
+// ---------------------------------------------------------
+// Enums
+// ---------------------------------------------------------
+
+enum Role {
+  PATIENT
+  CAREGIVER
+}
+
+enum MedStatus {
+  ACTIVE
+  COMPLETED
+  SUSPENDED
+}
+
+enum EventStatus {
+  PENDING
+  TAKEN
+  MISSED
+}
