@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AdherenceController } from './adherence.controller';
 import { AdherenceService } from './adherence.service';
-import { EventsService } from '../events/events.service';
+import { EventsModule } from '../events/events.module';
 
 @Module({
+  imports: [EventsModule],
   controllers: [AdherenceController],
-  providers: [AdherenceService, EventsService],
+  providers: [AdherenceService],
 })
 export class AdherenceModule {}

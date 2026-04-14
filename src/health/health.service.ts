@@ -15,19 +15,16 @@ export class HealthService {
   }
 
   async updateWeight(userId: string, weight: number) {
+    const existing = await this.prisma.healthData.findUnique({ where: { userId } });
+    const imc = this.calculateImc(weight, existing?.height ?? null);
+
     const health = await this.prisma.healthData.upsert({
       where: { userId },
-      update: { weight },
-      create: { userId, weight },
+      update: { weight, imc },
+      create: { userId, weight, imc },
     });
 
-    const imc = this.calculateImc(health.weight, health.height);
-    const updated = await this.prisma.healthData.update({
-      where: { userId },
-      data: { imc },
-    });
-
-    return { health: updated };
+    return { health };
   }
 
   async imc(userId: string) {
