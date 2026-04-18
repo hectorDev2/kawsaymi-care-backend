@@ -1,5 +1,17 @@
-import { Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import type { User } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
@@ -13,23 +25,43 @@ import { EventsRangeQueryDto } from './dto/events-range-query.dto';
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
-  @ApiOperation({ summary: 'Listar eventos con filtros opcionales de fecha, medicamento y estado' })
-  @ApiQuery({ name: 'from', required: false, example: '2026-04-14T00:00:00.000Z' })
-  @ApiQuery({ name: 'to', required: false, example: '2026-04-21T00:00:00.000Z' })
+  @ApiOperation({
+    summary:
+      'Listar eventos con filtros opcionales de fecha, medicamento y estado',
+  })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    example: '2026-04-14T00:00:00.000Z',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    example: '2026-04-21T00:00:00.000Z',
+  })
   @ApiQuery({ name: 'medicationId', required: false })
-  @ApiQuery({ name: 'status', required: false, enum: ['PENDING', 'TAKEN', 'MISSED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['PENDING', 'TAKEN', 'MISSED'],
+  })
   @Get()
   list(@GetUser() user: User, @Query() query: EventsRangeQueryDto) {
     return this.eventsService.list(user.id, query);
   }
 
-  @ApiOperation({ summary: 'Eventos de hoy — genera automáticamente si no existen' })
+  @ApiOperation({
+    summary: 'Eventos de hoy — genera automáticamente si no existen',
+  })
   @Get('today')
   today(@GetUser() user: User) {
     return this.eventsService.today(user.id);
   }
 
-  @ApiOperation({ summary: 'Eventos de la semana actual — genera automáticamente si no existen' })
+  @ApiOperation({
+    summary:
+      'Eventos de la semana actual — genera automáticamente si no existen',
+  })
   @Get('week')
   week(@GetUser() user: User) {
     return this.eventsService.week(user.id);

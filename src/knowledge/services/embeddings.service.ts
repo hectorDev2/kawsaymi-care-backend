@@ -1,0 +1,69 @@
+import { Injectable } from '@nestjs/common';
+
+import * as path from 'node:path';
+type FloatArrayOutput = { tolist(): number[][] };
+
+type Extractor = (
+  inputs: string[] | string,
+  opts?: { pooling?: 'mean' | 'cls'; normalize?: boolean },
+) => Promise<FloatArrayOutput>;
+
+@Injectable()
+export class EmbeddingsService {
+  private extractorPromise: Promise<Extractor> | null = null;
+
+  private getExtractor(): Promise<Extractor> {
+    if (!this.extractorPromise) {
+      // Load once and reuse (model is multilingual and small: D=384)
+      this.extractorPromise = (async () => {
+        // transformers.js is ESM; use dynamic import to work in CommonJS builds.
+        const mod = (await import('@huggingface/transformers')) as unknown as {
+          pipeline: (...args: any[]) => Promise<any>;
+        };
+
+        const cache_dir = path.join(process.cwd(), '.cache', 'transformers');
+
+        return (await mod.pipeline(
+          'feature-extraction',
+          'intfloat/multilingual-e5-small',
+          {
+            // Accuracy over speed; avoid quantization surprises.
+            dtype: 'fp32',
+            cache_dir,
+          },
+        )) as Extractor;
+      })();
+    }
+    return this.extractorPromise;
+  }
+
+  private l2Normalize(vec: number[]): number[] {
+    let sum = 0;
+    for (const v of vec) sum += v * v;
+    const norm = Math.sqrt(sum) || 1;
+    return vec.map((v) => v / norm);
+  }
+
+  private async embedText(texts: string[]): Promise<number[][]> {
+    const extractor = await this.getExtractor();
+
+    // mean pooling + normalize true yields unit vectors, but we normalize again
+    // to be robust to upstream changes.
+    const out = await extractor(texts, {
+      pooling: 'mean',
+      normalize: true,
+    });
+
+    const vectors = out.tolist();
+    return vectors.map((v) => this.l2Normalize(v));
+  }
+
+  async embedQuery(query: string): Promise<number[]> {
+    const [v] = await this.embedText([`query: ${query}`]);
+    return v;
+  }
+
+  async embedPassages(passages: string[]): Promise<number[][]> {
+    return this.embedText(passages.map((p) => `passage: ${p}`));
+  }
+}

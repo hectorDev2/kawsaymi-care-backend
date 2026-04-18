@@ -8,6 +8,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +23,11 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
+    // Registration is for regular users only. Admins should be provisioned explicitly.
+    if (dto.role === Role.ADMIN) {
+      throw new ConflictException('Invalid role');
+    }
+
     const { data, error } = await this.supabase.auth.signUp({
       email: dto.email,
       password: dto.password,

@@ -51,7 +51,69 @@ DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].poole
 SUPABASE_URL=https://[PROJECT-REF].supabase.co
 SUPABASE_ANON_KEY=tu-anon-key
 SUPABASE_JWT_SECRET=tu-jwt-secret
+
+# Vector DB (pgvector) - idealmente un Supabase separado
+VECTOR_DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres
+
+# (Opcional) Groq para RAG answers
+GROQ_API_KEY=...
 ```
+
+## Estado actual (2026-04-18)
+
+Hoy el backend ya tiene un primer MVP de **Knowledge Base (RAG)** funcionando:
+
+- Ingesta de PDFs desde `./pdfs_descargados` hacia una **DB vectorial** en Supabase (pgvector).
+- Embeddings locales con `@huggingface/transformers` usando `intfloat/multilingual-e5-small` (384 dims).
+- Búsqueda semántica por RPC (`match_document_chunks`).
+- Seguridad: endpoint de ingesta restringido a `Role=ADMIN`.
+
+Pendiente principal:
+
+- Acordar qué archivos/versionar (por ejemplo, no commitear `pdfs_descargados/`) y cerrar el diff con un commit.
+
+## Knowledge (pgvector)
+
+**Qué hace**
+
+- Los PDFs se leen desde `./pdfs_descargados`.
+- Ingesta: `POST /knowledge/documents` (requiere `Role=ADMIN`).
+- Búsqueda: `GET /knowledge/search?q=...&k=10`.
+
+**DB vectorial**
+
+- Se usa una conexión separada (sin Prisma) vía `pg`.
+- Variable: `VECTOR_DATABASE_URL` (idealmente a un Supabase separado del principal).
+- Antes de ingestar, aplicá el SQL en el Supabase vectorial:
+  `supabase/migrations/20260418121000_knowledge_vectors.sql`.
+
+**Embeddings**
+
+- Modelo: `intfloat/multilingual-e5-small`.
+- Dimensión: 384.
+- Regla E5:
+  `query: <texto>` para búsquedas.
+  `passage: <texto>` para chunks.
+- Se normaliza L2 para usar similitud coseno.
+- Cache local: el modelo se baja a `./.cache/transformers` (está ignorado por git).
+
+**Roles / Admin**
+
+- Prisma tiene `Role.ADMIN`.
+- El registro por `POST /auth/register` solo permite `PATIENT` y `CAREGIVER`.
+- Para crear un admin en dev:
+  Registrá un usuario normal y promovelo en la DB principal (`Role` a `ADMIN`).
+
+**Troubleshooting**
+
+- `Vector DB schema missing` o error Postgres `42P01`:
+  No se ejecutó el SQL de `supabase/migrations/20260418121000_knowledge_vectors.sql` en el Supabase vectorial que apunta `VECTOR_DATABASE_URL`.
+- Error `Tenant or user not found`:
+  `VECTOR_DATABASE_URL` mal armada para el pooler (usuario suele ser `postgres.<project-ref>`).
+- Error `Protobuf parsing failed` al cargar el modelo:
+  Cache corrupta. Borrar `./.cache/transformers` y reintentar (forzará re-descarga).
+- `pdfjs-dist` warnings de fonts:
+  Son frecuentes en PDFs “raros”; mientras extraiga texto, se puede ignorar.
 
 Los valores se obtienen en **Supabase → Project Settings → API**.
 

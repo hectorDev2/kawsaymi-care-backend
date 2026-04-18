@@ -99,6 +99,7 @@ model CaregiverRelation {
 enum Role {
   PATIENT
   CAREGIVER
+  ADMIN
 }
 
 enum MedStatus {

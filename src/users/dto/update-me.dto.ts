@@ -17,12 +17,18 @@ export class UpdateMeDto {
   @IsString()
   location?: string;
 
-  @ApiPropertyOptional({ example: 'es', description: 'Código de idioma ISO 639-1' })
+  @ApiPropertyOptional({
+    example: 'es',
+    description: 'Código de idioma ISO 639-1',
+  })
   @IsOptional()
   @IsString()
   language?: string;
 
-  @ApiPropertyOptional({ example: 'America/Argentina/Buenos_Aires', description: 'Timezone IANA' })
+  @ApiPropertyOptional({
+    example: 'America/Argentina/Buenos_Aires',
+    description: 'Timezone IANA',
+  })
   @IsOptional()
   @IsString()
   timezone?: string;

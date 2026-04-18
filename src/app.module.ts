@@ -12,6 +12,7 @@ import { AdherenceModule } from './adherence/adherence.module';
 import { HealthModule } from './health/health.module';
 import { CaregiversModule } from './caregivers/caregivers.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { KnowledgeModule } from './knowledge/knowledge.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
     HealthModule,
     CaregiversModule,
     SchedulerModule,
+    KnowledgeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

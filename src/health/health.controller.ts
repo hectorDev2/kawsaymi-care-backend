@@ -13,25 +13,35 @@ import { UpdateWeightDto } from './dto/update-weight.dto';
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
-  @ApiOperation({ summary: 'Obtener perfil de salud — crea uno vacío si no existe' })
+  @ApiOperation({
+    summary: 'Obtener perfil de salud — crea uno vacío si no existe',
+  })
   @Get('profile')
   profile(@GetUser() user: User) {
     return this.healthService.profile(user.id);
   }
 
-  @ApiOperation({ summary: 'Registrar peso en kg — recalcula IMC automáticamente si hay talla' })
+  @ApiOperation({
+    summary:
+      'Registrar peso en kg — recalcula IMC automáticamente si hay talla',
+  })
   @Post('weight')
   updateWeight(@GetUser() user: User, @Body() dto: UpdateWeightDto) {
     return this.healthService.updateWeight(user.id, dto.weight);
   }
 
-  @ApiOperation({ summary: 'Obtener IMC calculado — requiere tener peso y talla registrados' })
+  @ApiOperation({
+    summary: 'Obtener IMC calculado — requiere tener peso y talla registrados',
+  })
   @Get('imc')
   imc(@GetUser() user: User) {
     return this.healthService.imc(user.id);
   }
 
-  @ApiOperation({ summary: 'Detectar polifarmacia — true si el usuario tiene 5 o más medicamentos activos' })
+  @ApiOperation({
+    summary:
+      'Detectar polifarmacia — true si el usuario tiene 5 o más medicamentos activos',
+  })
   @Get('polypharmacy')
   polypharmacy(@GetUser() user: User) {
     return this.healthService.polypharmacy(user.id);

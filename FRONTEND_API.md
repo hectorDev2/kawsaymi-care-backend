@@ -33,6 +33,11 @@ Request:
 }
 ```
 
+Notas:
+
+- `role` en registro solo acepta `PATIENT` o `CAREGIVER`.
+- `ADMIN` no se puede registrar por API pública.
+
 Response (ejemplo):
 
 ```json
@@ -360,4 +365,64 @@ Response:
 
 ```json
 { "activeMedications": 2, "polypharmacy": false }
+```
+
+## Knowledge (RAG)
+
+### Requisitos
+
+- `GET /knowledge/search` requiere Bearer token (cualquier usuario autenticado).
+- `POST /knowledge/documents` requiere Bearer token con rol `ADMIN`.
+
+### POST /knowledge/documents
+
+Ingesta todos los PDFs desde `./pdfs_descargados` hacia la base vectorial.
+
+Response (ejemplo):
+
+```json
+{
+  "folder": "/ruta/al/proyecto/pdfs_descargados",
+  "processed": 2,
+  "documents": [
+    {
+      "source": "local:guia1.pdf",
+      "documentId": "...",
+      "chunks": 145
+    }
+  ]
+}
+```
+
+### GET /knowledge/search
+
+Query params:
+
+- `q` (requerido): texto de búsqueda
+- `k` (opcional): top resultados, default `10`, rango `1..50`
+
+Ejemplo:
+
+`GET /knowledge/search?q=control%20de%20hipertension&k=5`
+
+Response (ejemplo):
+
+```json
+{
+  "matches": [
+    {
+      "chunkId": "...",
+      "documentId": "...",
+      "page": 12,
+      "chunkIndex": 3,
+      "content": "...",
+      "score": 0.83,
+      "docSource": "local:guia1.pdf",
+      "docTitle": "guia1.pdf",
+      "docMetadata": {
+        "kind": "pdf"
+      }
+    }
+  ]
+}
 ```

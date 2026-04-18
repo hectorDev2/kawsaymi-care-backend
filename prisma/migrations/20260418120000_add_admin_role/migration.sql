@@ -1,0 +1,2 @@
+-- Add ADMIN role
+ALTER TYPE "Role" ADD VALUE 'ADMIN';

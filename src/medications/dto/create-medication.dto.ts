@@ -1,4 +1,12 @@
-import { ArrayNotEmpty, IsArray, IsDateString, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateMedicationDto {
@@ -35,7 +43,11 @@ export class CreateMedicationDto {
   endDate?: string;
 
   @ApiProperty({
-    example: ['2026-04-14T08:00:00.000Z', '2026-04-14T16:00:00.000Z', '2026-04-14T22:00:00.000Z'],
+    example: [
+      '2026-04-14T08:00:00.000Z',
+      '2026-04-14T16:00:00.000Z',
+      '2026-04-14T22:00:00.000Z',
+    ],
     description: 'Horarios de toma en formato ISO 8601',
     type: [String],
   })

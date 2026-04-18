@@ -12,7 +12,9 @@ import { AdherenceService } from './adherence.service';
 export class AdherenceController {
   constructor(private readonly adherenceService: AdherenceService) {}
 
-  @ApiOperation({ summary: 'Adherencia de hoy — taken/missed/pending y porcentaje' })
+  @ApiOperation({
+    summary: 'Adherencia de hoy — taken/missed/pending y porcentaje',
+  })
   @Get('today')
   today(@GetUser() user: User) {
     return this.adherenceService.today(user.id);
@@ -30,7 +32,10 @@ export class AdherenceController {
     return this.adherenceService.month(user.id);
   }
 
-  @ApiOperation({ summary: 'Stats generales: adherencia semanal + cantidad de medicamentos activos' })
+  @ApiOperation({
+    summary:
+      'Stats generales: adherencia semanal + cantidad de medicamentos activos',
+  })
   @Get('stats')
   stats(@GetUser() user: User) {
     return this.adherenceService.stats(user.id);

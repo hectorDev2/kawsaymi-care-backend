@@ -21,7 +21,10 @@ export class UsersController {
     return this.usersService.getMe(user.id);
   }
 
-  @ApiOperation({ summary: 'Actualizar nombre, fecha de nacimiento, ubicación, idioma y timezone' })
+  @ApiOperation({
+    summary:
+      'Actualizar nombre, fecha de nacimiento, ubicación, idioma y timezone',
+  })
   @Put('me')
   updateMe(@GetUser() user: User, @Body() dto: UpdateMeDto) {
     return this.usersService.updateMe(user.id, dto);

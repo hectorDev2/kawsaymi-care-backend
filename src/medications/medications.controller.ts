@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
@@ -27,7 +37,10 @@ export class MedicationsController {
     return this.medicationsService.get(user.id, id);
   }
 
-  @ApiOperation({ summary: 'Crear medicamento — el campo schedule define los horarios de toma' })
+  @ApiOperation({
+    summary:
+      'Crear medicamento — el campo schedule define los horarios de toma',
+  })
   @Post()
   create(@GetUser() user: User, @Body() dto: CreateMedicationDto) {
     return this.medicationsService.create(user.id, dto);
@@ -35,13 +48,21 @@ export class MedicationsController {
 
   @ApiOperation({ summary: 'Actualizar datos del medicamento' })
   @Put(':id')
-  update(@GetUser() user: User, @Param('id') id: string, @Body() dto: UpdateMedicationDto) {
+  update(
+    @GetUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: UpdateMedicationDto,
+  ) {
     return this.medicationsService.update(user.id, id, dto);
   }
 
   @ApiOperation({ summary: 'Cambiar estado: ACTIVE | SUSPENDED | COMPLETED' })
   @Patch(':id/status')
-  updateStatus(@GetUser() user: User, @Param('id') id: string, @Body() dto: UpdateMedicationStatusDto) {
+  updateStatus(
+    @GetUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: UpdateMedicationStatusDto,
+  ) {
     return this.medicationsService.updateStatus(user.id, id, dto.status);
   }
 

@@ -29,12 +29,20 @@ export class SchedulerService {
     let created = 0;
 
     for (const med of meds) {
-      const candidates: { medicationId: string; userId: string; dateTimeScheduled: Date }[] = [];
+      const candidates: {
+        medicationId: string;
+        userId: string;
+        dateTimeScheduled: Date;
+      }[] = [];
 
       for (const iso of med.schedule) {
         const dt = DateTime.fromISO(iso, { setZone: true }).toUTC();
         if (!dt.isValid || dt < from || dt >= to) continue;
-        candidates.push({ medicationId: med.id, userId: med.userId, dateTimeScheduled: dt.toJSDate() });
+        candidates.push({
+          medicationId: med.id,
+          userId: med.userId,
+          dateTimeScheduled: dt.toJSDate(),
+        });
       }
 
       if (candidates.length === 0) continue;
@@ -46,7 +54,9 @@ export class SchedulerService {
         },
         select: { dateTimeScheduled: true },
       });
-      const existingSet = new Set(existing.map((e) => e.dateTimeScheduled.toISOString()));
+      const existingSet = new Set(
+        existing.map((e) => e.dateTimeScheduled.toISOString()),
+      );
 
       const toCreate = candidates.filter(
         (c) => !existingSet.has(c.dateTimeScheduled.toISOString()),

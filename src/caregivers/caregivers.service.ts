@@ -18,12 +18,18 @@ export class CaregiversService {
     if (!caregiver) throw new NotFoundException('Caregiver user not found');
 
     const existing = await this.prisma.caregiverRelation.findUnique({
-      where: { patientId_caregiverId: { patientId, caregiverId: caregiver.id } },
+      where: {
+        patientId_caregiverId: { patientId, caregiverId: caregiver.id },
+      },
     });
     if (existing) throw new ConflictException('Relation already exists');
 
     const relation = await this.prisma.caregiverRelation.create({
-      data: { patientId, caregiverId: caregiver.id, permissions: dto.permissions },
+      data: {
+        patientId,
+        caregiverId: caregiver.id,
+        permissions: dto.permissions,
+      },
       include: { caregiver: true },
     });
     return { relation };
@@ -45,7 +51,11 @@ export class CaregiversService {
     return { relations };
   }
 
-  async updatePermissions(userId: string, relationId: string, permissions: string[]) {
+  async updatePermissions(
+    userId: string,
+    relationId: string,
+    permissions: string[],
+  ) {
     const relation = await this.prisma.caregiverRelation.findUnique({
       where: { id: relationId },
     });
