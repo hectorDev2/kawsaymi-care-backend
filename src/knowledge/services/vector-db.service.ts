@@ -150,6 +150,25 @@ export class VectorDbService {
     );
   }
 
+  async getExistingChunkKeysByDocumentId(
+    documentId: string,
+  ): Promise<Set<string>> {
+    const res = await this.pool.query<{ page: number; chunk_index: number }>(
+      `
+      SELECT page, chunk_index
+      FROM public.knowledge_document_chunks
+      WHERE document_id = $1
+      `,
+      [documentId],
+    );
+
+    const keys = new Set<string>();
+    for (const r of res.rows) {
+      keys.add(`${r.page}:${r.chunk_index}`);
+    }
+    return keys;
+  }
+
   async insertChunks(
     chunks: Array<{
       documentId: string;

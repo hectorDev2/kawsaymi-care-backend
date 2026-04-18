@@ -55,7 +55,7 @@ export class IngestService {
         continue;
       }
 
-      // Upsert document, then replace all chunks.
+      // Upsert document.
       const doc = await this.vectorDb.upsertDocument({
         source,
         title: fileName,
@@ -69,13 +69,22 @@ export class IngestService {
       });
 
       const documentId = doc.id;
-      await this.vectorDb.deleteChunksByDocumentId(documentId);
 
-      // Embed in batches.
+      // Hard idempotency: do not delete existing chunks. On retries, insert will
+      // upsert per unique key; we also skip keys that already exist to avoid
+      // re-embedding work.
+      const existingKeys =
+        await this.vectorDb.getExistingChunkKeysByDocumentId(documentId);
+
+      // Embed missing chunks in batches.
       const batchSize = 32;
       let inserted = 0;
-      for (let i = 0; i < chunks.length; i += batchSize) {
-        const batch = chunks.slice(i, i + batchSize);
+      const missing = chunks.filter(
+        (c) => !existingKeys.has(`${c.page}:${c.chunkIndex}`),
+      );
+
+      for (let i = 0; i < missing.length; i += batchSize) {
+        const batch = missing.slice(i, i + batchSize);
         const embeddings = await this.embeddings.embedPassages(
           batch.map((c) => c.content),
         );
