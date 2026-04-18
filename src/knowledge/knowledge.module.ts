@@ -7,6 +7,7 @@ import { EmbeddingsService } from './services/embeddings.service';
 import { PdfTextService } from './services/pdf-text.service';
 import { ChunkingService } from './services/chunking.service';
 import { IngestService } from './services/ingest.service';
+import { GroqService } from './services/groq.service';
 
 @Module({
   imports: [PrismaModule, AuthModule],
@@ -17,6 +18,7 @@ import { IngestService } from './services/ingest.service';
     PdfTextService,
     ChunkingService,
     IngestService,
+    GroqService,
   ],
 })
 export class KnowledgeModule {}
