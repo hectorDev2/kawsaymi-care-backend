@@ -57,6 +57,10 @@ VECTOR_DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION
 
 # (Opcional) Groq para RAG answers
 GROQ_API_KEY=...
+
+# (Opcional) Override Groq defaults
+# GROQ_MODEL=llama-3.1-8b-instant
+# GROQ_BASE_URL=https://api.groq.com/openai/v1
 ```
 
 ## Estado actual (2026-04-18)
@@ -79,6 +83,7 @@ Pendiente principal:
 - Los PDFs se leen desde `./pdfs_descargados`.
 - Ingesta: `POST /knowledge/documents` (requiere `Role=ADMIN`).
 - Búsqueda: `GET /knowledge/search?q=...&k=10`.
+- Respuesta RAG (Groq): `POST /knowledge/answer` (requiere auth) — arma contexto con chunks y genera respuesta.
 
 **DB vectorial**
 
@@ -114,6 +119,25 @@ Pendiente principal:
   Cache corrupta. Borrar `./.cache/transformers` y reintentar (forzará re-descarga).
 - `pdfjs-dist` warnings de fonts:
   Son frecuentes en PDFs “raros”; mientras extraiga texto, se puede ignorar.
+
+### Ejemplo: RAG con Groq
+
+1) Seteá `GROQ_API_KEY` en el `.env`.
+
+2) Llamá al endpoint:
+
+```bash
+curl -X POST "http://localhost:3000/knowledge/answer" \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"q":"¿Qué recomienda la guía sobre dengue en adultos?","k":6}'
+```
+
+Devuelve:
+
+- `answer`: respuesta del modelo (instruido a citar fuentes [S1], [S2], ...)
+- `sources`: metadata compacta por fuente
+- `matches`: chunks usados (solo si `debug=true`)
 
 Los valores se obtienen en **Supabase → Project Settings → API**.
 
