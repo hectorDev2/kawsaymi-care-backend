@@ -369,6 +369,25 @@ Response:
 
 ## Knowledge (RAG)
 
+### Groq (RAG) desde el Frontend
+
+El frontend NO llama a Groq directo. Llama al backend y el backend:
+
+- genera embeddings localmente,
+- busca chunks relevantes en la Vector DB (pgvector),
+- y recién ahí llama a Groq para redactar una respuesta basada SOLO en ese contexto.
+
+Requisitos en backend (variables de entorno):
+
+```env
+GROQ_API_KEY=...
+# (Opcional)
+# GROQ_MODEL=llama-3.1-8b-instant
+# GROQ_BASE_URL=https://api.groq.com/openai/v1
+```
+
+Todos los endpoints de Knowledge requieren Bearer token.
+
 ### Requisitos
 
 - `GET /knowledge/search` requiere Bearer token (cualquier usuario autenticado).
@@ -424,5 +443,109 @@ Response (ejemplo):
       }
     }
   ]
+}
+```
+
+Uso recomendado en UI:
+
+- Usar `/knowledge/search` si querés armar una pantalla de "resultados" (mostrar snippets y scores).
+- Usar `/knowledge/answer` si querés una respuesta conversacional (RAG) y solo mostrar "Fuentes".
+
+### POST /knowledge/answer
+
+Genera una respuesta RAG usando Groq.
+
+Request:
+
+```json
+{
+  "q": "¿Qué recomienda la guía sobre dengue en adultos?",
+  "k": 6,
+  "scoreMin": 0.8,
+  "debug": false
+}
+```
+
+Campos:
+
+- `q` (string, requerido): pregunta del usuario.
+- `k` (number, opcional, default 6, max 20): cantidad de chunks a usar.
+- `scoreMin` (0..1, opcional, default 0.8): umbral mínimo de similitud.
+- `debug` (boolean, opcional): si `true` devuelve también los matches crudos (útil para desarrollo).
+
+Response (normal):
+
+```json
+{
+  "answer": "...",
+  "sources": [
+    {
+      "id": "S1",
+      "source": "local:guia1.pdf",
+      "title": "guia1.pdf",
+      "page": 12,
+      "chunkIndex": 3,
+      "score": 0.83
+    }
+  ]
+}
+```
+
+Response (debug=true) agrega:
+
+- `matches`: los chunks finales usados
+- `rawMatches`: candidatos antes del filtro
+- `scoreMin`: el umbral aplicado
+
+Ejemplo (curl):
+
+```bash
+curl -X POST "http://localhost:3000/knowledge/answer" \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"q":"¿Qué recomienda la guía sobre dengue en adultos?","k":6,"scoreMin":0.8}'
+```
+
+Ejemplo (TypeScript en frontend, usando fetch):
+
+```ts
+type KnowledgeAnswerBody = {
+  q: string;
+  k?: number;
+  scoreMin?: number;
+  debug?: boolean;
+};
+
+export async function knowledgeAnswer(
+  baseUrl: string,
+  accessToken: string,
+  body: KnowledgeAnswerBody,
+) {
+  const res = await fetch(`${baseUrl}/knowledge/answer`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    // El backend devuelve { message: string } en errores Nest
+    const message = json?.message ?? 'Error consultando knowledge/answer';
+    throw new Error(message);
+  }
+  return json as {
+    answer: string;
+    sources: Array<{
+      id: string;
+      source: string;
+      title: string | null;
+      page: number;
+      chunkIndex: number;
+      score: number;
+    }>;
+  };
 }
 ```

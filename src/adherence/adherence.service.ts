@@ -35,17 +35,12 @@ export class AdherenceService {
   }
 
   async stats(userId: string) {
-    // Simple stats: last 7 days adherence and active medication count.
     const { from, to } = await this.getUserWeekRange(userId);
-    const summary = await this.summarize(userId, from, to);
-    const activeMedications = await this.prisma.medication.count({
-      where: { userId, status: 'ACTIVE' },
-    });
-    return { ...summary, activeMedications };
+    return this.summarize(userId, from, to);
   }
 
   private async summarize(userId: string, from: DateTime, to: DateTime) {
-    const [taken, missed, pending] = await Promise.all([
+    const [taken, missed, pending, activeMedications] = await Promise.all([
       this.prisma.medicationEvent.count({
         where: {
           userId,
@@ -67,12 +62,13 @@ export class AdherenceService {
           dateTimeScheduled: { gte: from.toJSDate(), lt: to.toJSDate() },
         },
       }),
+      this.prisma.medication.count({ where: { userId, status: 'ACTIVE' } }),
     ]);
 
     const total = taken + missed + pending;
     const adherenceRate = total === 0 ? 0 : taken / total;
 
-    return { taken, missed, pending, total, adherenceRate };
+    return { taken, missed, pending, total, adherenceRate, activeMedications };
   }
 
   private async getUserTimezone(userId: string) {

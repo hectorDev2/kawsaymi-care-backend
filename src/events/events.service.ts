@@ -68,10 +68,24 @@ export class EventsService {
           lt: to ? to.toJSDate() : undefined,
         },
       },
+      include: {
+        medication: {
+          select: { name: true, dose: true },
+        },
+      },
       orderBy: { dateTimeScheduled: 'asc' },
     });
 
-    return { events };
+    return {
+      events: events.map((e) => ({
+        id: e.id,
+        medicationId: e.medicationId,
+        medicationName: e.medication.name,
+        medicationDose: e.medication.dose,
+        dateTimeScheduled: e.dateTimeScheduled,
+        status: e.status,
+      })),
+    };
   }
 
   async mark(userId: string, id: string, status: MarkStatus) {
