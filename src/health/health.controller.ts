@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import type { User } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { HealthService } from './health.service';
 import { UpdateWeightDto } from './dto/update-weight.dto';
+import { UpdateHealthProfileDto } from './dto/update-health-profile.dto';
 
 @ApiTags('Health')
 @ApiBearerAuth()
@@ -19,6 +20,15 @@ export class HealthController {
   @Get('profile')
   profile(@GetUser() user: User) {
     return this.healthService.profile(user.id);
+  }
+
+  @ApiOperation({
+    summary:
+      'Actualizar perfil de salud (peso/altura) — recalcula IMC cuando ambos existen',
+  })
+  @Put('profile')
+  updateProfile(@GetUser() user: User, @Body() dto: UpdateHealthProfileDto) {
+    return this.healthService.updateProfile(user.id, dto);
   }
 
   @ApiOperation({

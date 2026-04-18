@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { UpdateHealthProfileDto } from './dto/update-health-profile.dto';
 
 @Injectable()
 export class HealthService {
@@ -24,6 +25,33 @@ export class HealthService {
       where: { userId },
       update: { weight, imc },
       create: { userId, weight, imc },
+    });
+
+    return { health };
+  }
+
+  async updateProfile(userId: string, dto: UpdateHealthProfileDto) {
+    const existing = await this.prisma.healthData.findUnique({
+      where: { userId },
+    });
+
+    const weight = dto.weight ?? existing?.weight ?? null;
+    const height = dto.height ?? existing?.height ?? null;
+    const imc = this.calculateImc(weight, height);
+
+    const health = await this.prisma.healthData.upsert({
+      where: { userId },
+      update: {
+        weight: dto.weight,
+        height: dto.height,
+        imc,
+      },
+      create: {
+        userId,
+        weight: dto.weight,
+        height: dto.height,
+        imc,
+      },
     });
 
     return { health };
@@ -55,6 +83,9 @@ export class HealthService {
   private calculateImc(weight: number | null, height: number | null) {
     if (!weight || !height) return null;
     if (height <= 0) return null;
-    return weight / (height * height);
+    // Frontend contract uses height in centimeters.
+    const heightM = height / 100;
+    if (heightM <= 0) return null;
+    return weight / (heightM * heightM);
   }
 }
