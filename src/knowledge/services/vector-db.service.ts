@@ -41,7 +41,11 @@ export class VectorDbService {
       throw new Error('VECTOR_DATABASE_URL is required');
     }
 
-    this.pool = new Pool({ connectionString });
+    this.pool = new Pool({
+      connectionString,
+      connectionTimeoutMillis: 10_000,
+      statement_timeout: 15_000,
+    });
   }
 
   private toVectorLiteral(values: number[]): string {

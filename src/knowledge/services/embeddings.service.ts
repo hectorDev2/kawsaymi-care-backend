@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
 import * as path from 'node:path';
 type FloatArrayOutput = { tolist(): number[][] };
@@ -9,14 +9,26 @@ type Extractor = (
 ) => Promise<FloatArrayOutput>;
 
 @Injectable()
-export class EmbeddingsService {
+export class EmbeddingsService implements OnModuleInit {
+  private readonly logger = new Logger(EmbeddingsService.name);
   private extractorPromise: Promise<Extractor> | null = null;
+
+  async onModuleInit() {
+    this.logger.log('Pre-warming embedding model...');
+    try {
+      await this.getExtractor();
+      this.logger.log('Embedding model ready');
+    } catch (e) {
+      this.logger.error(
+        'Failed to pre-warm embedding model — first request will be slow',
+        e,
+      );
+    }
+  }
 
   private getExtractor(): Promise<Extractor> {
     if (!this.extractorPromise) {
-      // Load once and reuse (model is multilingual and small: D=384)
       this.extractorPromise = (async () => {
-        // transformers.js is ESM; use dynamic import to work in CommonJS builds.
         const mod = (await import('@huggingface/transformers')) as unknown as {
           pipeline: (...args: any[]) => Promise<any>;
         };
@@ -27,7 +39,6 @@ export class EmbeddingsService {
           'feature-extraction',
           'intfloat/multilingual-e5-small',
           {
-            // Accuracy over speed; avoid quantization surprises.
             dtype: 'fp32',
             cache_dir,
           },
