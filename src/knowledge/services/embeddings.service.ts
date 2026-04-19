@@ -35,11 +35,13 @@ export class EmbeddingsService implements OnModuleInit {
 
         const cache_dir = path.join(process.cwd(), '.cache', 'transformers');
 
+        const dtype = (process.env.EMBEDDINGS_DTYPE as 'fp32' | 'q8') ?? 'q8';
+
         return (await mod.pipeline(
           'feature-extraction',
           'intfloat/multilingual-e5-small',
           {
-            dtype: 'fp32',
+            dtype,
             cache_dir,
           },
         )) as Extractor;
