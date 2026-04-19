@@ -3,6 +3,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
+  InternalServerErrorException,
   Post,
   Query,
   UseGuards,
@@ -24,32 +26,20 @@ import { KnowledgeAnswerDto } from './dto/answer.dto';
 import { GroqService } from './services/groq.service';
 import { VectorSearchMatch } from './services/vector-db.service';
 
-type KnowledgeAnswerResponse =
-  | {
-      answer: string;
-      sources: Array<{
-        id: string;
-        source: string;
-        title: string | null;
-        page: number;
-        chunkIndex: number;
-        score: number;
-      }>;
-    }
-  | {
-      answer: string;
-      sources: Array<{
-        id: string;
-        source: string;
-        title: string | null;
-        page: number;
-        chunkIndex: number;
-        score: number;
-      }>;
-      matches: VectorSearchMatch[];
-      rawMatches: VectorSearchMatch[];
-      scoreMin: number;
-    };
+type KnowledgeAnswerResponse = {
+  answer: string;
+  sources: Array<{
+    id: string;
+    source: string;
+    title: string | null;
+    page: number;
+    chunkIndex: number;
+    score: number;
+  }>;
+  scoreMin: number;
+  matches?: VectorSearchMatch[];
+  rawMatches?: VectorSearchMatch[];
+};
 
 @ApiTags('Knowledge')
 @Controller('knowledge')
@@ -101,84 +91,98 @@ export class KnowledgeController {
   async answer(
     @Body() dto: KnowledgeAnswerDto,
   ): Promise<KnowledgeAnswerResponse> {
-    const q = dto.q?.trim();
-    if (!q) {
-      throw new BadRequestException('q is required');
-    }
-
-    const k = dto.k ?? 6;
-    const embedding = await this.embeddings.embedQuery(q);
-    const scoreMin = dto.scoreMin ?? 0.8;
-    const debug = dto.debug === true;
-
-    const rawMatches = await this.vectorDb.matchDocumentChunks(
-      embedding,
-      Math.min(50, Math.max(k * 3, k)),
-    );
-
-    // Filter low-signal chunks (bibliography/URLs/mostly numeric) and apply score threshold.
-    const filtered = rawMatches.filter((m) => {
-      if (m.score < scoreMin) return false;
-      const text = (m.content ?? '').trim();
-      if (text.length < 80) return false;
-
-      const lower = text.toLowerCase();
-      if (
-        lower.includes('bibliograf') ||
-        lower.includes('referenc') ||
-        lower.includes('references')
-      ) {
-        return false;
+    try {
+      const q = dto.q?.trim();
+      if (!q) {
+        throw new BadRequestException('q is required');
       }
 
-      // Too many URLs relative to text.
-      const urls = (text.match(/https?:\/\//g) ?? []).length;
-      if (urls >= 2) return false;
+      const k = dto.k ?? 10;
+      const scoreMin = dto.scoreMin ?? 0.7;
+      const debug = dto.debug === true;
 
-      // Mostly numeric (tables, codes) tends to be unhelpful for QA.
-      const digits = (text.match(/[0-9]/g) ?? []).length;
-      if (digits / Math.max(1, text.length) > 0.25) return false;
+      const embedding = await this.embeddings.embedQuery(q);
 
-      return true;
-    });
+      const rawMatches = await this.vectorDb.matchDocumentChunks(
+        embedding,
+        Math.min(50, k * 3),
+      );
 
-    const matches = filtered.slice(0, k);
+      const filtered = rawMatches.filter((m) => {
+        if (m.score < scoreMin) return false;
+        const text = (m.content ?? '').trim();
+        if (text.length < 80) return false;
 
-    // Build a compact context window.
-    const maxChars = 12000;
-    let used = 0;
-    const parts: string[] = [];
-    const sources = matches.map((m, idx) => ({
-      id: `S${idx + 1}`,
-      source: m.docSource,
-      title: m.docTitle,
-      page: m.page,
-      chunkIndex: m.chunkIndex,
-      score: m.score,
-    }));
+        const lower = text.toLowerCase();
+        if (
+          lower.includes('bibliograf') ||
+          lower.includes('referenc') ||
+          lower.includes('references')
+        ) {
+          return false;
+        }
 
-    for (let i = 0; i < matches.length; i++) {
-      const m = matches[i];
-      const id = `S${i + 1}`;
-      const header = `[${id}] ${m.docSource} p.${m.page} chunk:${m.chunkIndex} (score:${m.score.toFixed(
-        3,
-      )})`;
-      const block = `${header}\n${m.content}`;
-      if (used + block.length + 2 > maxChars) break;
-      parts.push(block);
-      used += block.length + 2;
+        const urls = (text.match(/https?:\/\//g) ?? []).length;
+        if (urls >= 2) return false;
+
+        const digits = (text.match(/[0-9]/g) ?? []).length;
+        if (digits / Math.max(1, text.length) > 0.25) return false;
+
+        return true;
+      });
+
+      const matches = filtered.slice(0, k);
+
+      if (matches.length === 0) {
+        const base: KnowledgeAnswerResponse = {
+          answer:
+            'No encontré fuentes suficientes en la base de conocimiento para responder esta pregunta con certeza.',
+          sources: [],
+          scoreMin,
+        };
+        if (debug) {
+          base.matches = [];
+          base.rawMatches = rawMatches;
+        }
+        return base;
+      }
+
+      const maxChars = 12000;
+      let used = 0;
+      const parts: string[] = [];
+      const sources = matches.map((m, idx) => ({
+        id: `S${idx + 1}`,
+        source: m.docSource,
+        title: m.docTitle,
+        page: m.page,
+        chunkIndex: m.chunkIndex,
+        score: m.score,
+      }));
+
+      for (let i = 0; i < matches.length; i++) {
+        const m = matches[i];
+        const id = `S${i + 1}`;
+        const header = `[${id}] ${m.docSource} p.${m.page} chunk:${m.chunkIndex} (score:${m.score.toFixed(3)})`;
+        const block = `${header}\n${m.content}`;
+        if (used + block.length + 2 > maxChars) break;
+        parts.push(block);
+        used += block.length + 2;
+      }
+
+      const context = parts.join('\n\n');
+      const answer = await this.groq.generateAnswer({ question: q, context });
+
+      const base: KnowledgeAnswerResponse = { answer, sources, scoreMin };
+      if (debug) {
+        base.matches = matches;
+        base.rawMatches = rawMatches;
+      }
+      return base;
+    } catch (e) {
+      if (e instanceof HttpException) throw e;
+      throw new InternalServerErrorException(
+        e instanceof Error ? e.message : 'Unexpected error in /knowledge/answer',
+      );
     }
-
-    const context = parts.join('\n\n');
-    const answer = await this.groq.generateAnswer({
-      question: q,
-      context,
-    });
-
-    if (debug) {
-      return { answer, sources, matches, rawMatches, scoreMin };
-    }
-
-    return { answer, sources };
   }
 }
