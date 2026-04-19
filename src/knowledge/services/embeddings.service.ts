@@ -5,7 +5,7 @@ export class EmbeddingsService {
   private readonly hfApiKey = process.env.HUGGINGFACE_API_KEY;
   private readonly hfUrl =
     process.env.HUGGINGFACE_API_URL ??
-    'https://api-inference.huggingface.co/models/intfloat/multilingual-e5-small';
+    'https://router.huggingface.co/hf-inference/models/intfloat/multilingual-e5-small/v1/feature-extraction';
 
   private l2Normalize(vec: number[]): number[] {
     let sum = 0;
@@ -38,10 +38,7 @@ export class EmbeddingsService {
         Authorization: `Bearer ${this.hfApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        inputs: texts,
-        options: { wait_for_model: true },
-      }),
+      body: JSON.stringify({ inputs: texts }),
     });
 
     if (!res.ok) {
