@@ -1,11 +1,15 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 
+type CohereEmbedResponse = {
+  embeddings: { float: number[][] };
+};
+
 @Injectable()
 export class EmbeddingsService {
-  private readonly hfApiKey = process.env.HUGGINGFACE_API_KEY;
-  private readonly hfUrl =
-    process.env.HUGGINGFACE_API_URL ??
-    'https://router.huggingface.co/hf-inference/models/intfloat/multilingual-e5-small/v1/feature-extraction';
+  private readonly apiKey = process.env.COHERE_API_KEY;
+  private readonly model =
+    process.env.COHERE_EMBED_MODEL ?? 'embed-multilingual-light-v3.0';
+  private readonly baseUrl = 'https://api.cohere.com/v2/embed';
 
   private l2Normalize(vec: number[]): number[] {
     let sum = 0;
@@ -14,57 +18,45 @@ export class EmbeddingsService {
     return vec.map((v) => v / norm);
   }
 
-  private meanPool(tokenEmbeddings: number[][]): number[] {
-    const dims = tokenEmbeddings[0].length;
-    const result = new Array<number>(dims).fill(0);
-    for (const token of tokenEmbeddings) {
-      for (let i = 0; i < dims; i++) {
-        result[i] += token[i];
-      }
-    }
-    return result.map((v) => v / tokenEmbeddings.length);
-  }
-
-  private async embedText(texts: string[]): Promise<number[][]> {
-    if (!this.hfApiKey) {
-      throw new InternalServerErrorException(
-        'HUGGINGFACE_API_KEY is not configured',
-      );
+  private async embed(
+    texts: string[],
+    inputType: 'search_query' | 'search_document',
+  ): Promise<number[][]> {
+    if (!this.apiKey) {
+      throw new InternalServerErrorException('COHERE_API_KEY is not configured');
     }
 
-    const res = await fetch(this.hfUrl, {
+    const res = await fetch(this.baseUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${this.hfApiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ inputs: texts }),
+      body: JSON.stringify({
+        model: this.model,
+        texts,
+        input_type: inputType,
+        embedding_types: ['float'],
+      }),
     });
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new InternalServerErrorException(
-        `HuggingFace API error: ${res.status} ${res.statusText}${text ? ` — ${text}` : ''}`,
+        `Cohere API error: ${res.status} ${res.statusText}${text ? ` — ${text}` : ''}`,
       );
     }
 
-    // HF feature-extraction returns 3D [batch, seq_len, hidden] or 2D [batch, hidden]
-    const data = (await res.json()) as number[][][] | number[][];
-
-    return (data as Array<number[] | number[][]>).map((item) => {
-      if (Array.isArray(item[0])) {
-        return this.l2Normalize(this.meanPool(item as number[][]));
-      }
-      return this.l2Normalize(item as number[]);
-    });
+    const data = (await res.json()) as CohereEmbedResponse;
+    return data.embeddings.float.map((v) => this.l2Normalize(v));
   }
 
   async embedQuery(query: string): Promise<number[]> {
-    const [v] = await this.embedText([`query: ${query}`]);
+    const [v] = await this.embed([query], 'search_query');
     return v;
   }
 
   async embedPassages(passages: string[]): Promise<number[][]> {
-    return this.embedText(passages.map((p) => `passage: ${p}`));
+    return this.embed(passages, 'search_document');
   }
 }
