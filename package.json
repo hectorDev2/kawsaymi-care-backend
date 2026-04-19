@@ -32,7 +32,6 @@
     "@prisma/client": "^7.7.0",
     "@supabase/supabase-js": "^2.103.0",
     "@types/luxon": "^3.7.1",
-    "@huggingface/transformers": "^3.7.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "jwks-rsa": "^4.0.1",

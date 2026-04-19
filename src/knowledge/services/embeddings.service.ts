@@ -1,54 +1,11 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-
-import * as path from 'node:path';
-type FloatArrayOutput = { tolist(): number[][] };
-
-type Extractor = (
-  inputs: string[] | string,
-  opts?: { pooling?: 'mean' | 'cls'; normalize?: boolean },
-) => Promise<FloatArrayOutput>;
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 
 @Injectable()
-export class EmbeddingsService implements OnModuleInit {
-  private readonly logger = new Logger(EmbeddingsService.name);
-  private extractorPromise: Promise<Extractor> | null = null;
-
-  async onModuleInit() {
-    this.logger.log('Pre-warming embedding model...');
-    try {
-      await this.getExtractor();
-      this.logger.log('Embedding model ready');
-    } catch (e) {
-      this.logger.error(
-        'Failed to pre-warm embedding model — first request will be slow',
-        e,
-      );
-    }
-  }
-
-  private getExtractor(): Promise<Extractor> {
-    if (!this.extractorPromise) {
-      this.extractorPromise = (async () => {
-        const mod = (await import('@huggingface/transformers')) as unknown as {
-          pipeline: (...args: any[]) => Promise<any>;
-        };
-
-        const cache_dir = path.join(process.cwd(), '.cache', 'transformers');
-
-        const dtype = (process.env.EMBEDDINGS_DTYPE as 'fp32' | 'q8') ?? 'q8';
-
-        return (await mod.pipeline(
-          'feature-extraction',
-          'intfloat/multilingual-e5-small',
-          {
-            dtype,
-            cache_dir,
-          },
-        )) as Extractor;
-      })();
-    }
-    return this.extractorPromise;
-  }
+export class EmbeddingsService {
+  private readonly hfApiKey = process.env.HUGGINGFACE_API_KEY;
+  private readonly hfUrl =
+    process.env.HUGGINGFACE_API_URL ??
+    'https://api-inference.huggingface.co/models/intfloat/multilingual-e5-small';
 
   private l2Normalize(vec: number[]): number[] {
     let sum = 0;
@@ -57,18 +14,52 @@ export class EmbeddingsService implements OnModuleInit {
     return vec.map((v) => v / norm);
   }
 
-  private async embedText(texts: string[]): Promise<number[][]> {
-    const extractor = await this.getExtractor();
+  private meanPool(tokenEmbeddings: number[][]): number[] {
+    const dims = tokenEmbeddings[0].length;
+    const result = new Array<number>(dims).fill(0);
+    for (const token of tokenEmbeddings) {
+      for (let i = 0; i < dims; i++) {
+        result[i] += token[i];
+      }
+    }
+    return result.map((v) => v / tokenEmbeddings.length);
+  }
 
-    // mean pooling + normalize true yields unit vectors, but we normalize again
-    // to be robust to upstream changes.
-    const out = await extractor(texts, {
-      pooling: 'mean',
-      normalize: true,
+  private async embedText(texts: string[]): Promise<number[][]> {
+    if (!this.hfApiKey) {
+      throw new InternalServerErrorException(
+        'HUGGINGFACE_API_KEY is not configured',
+      );
+    }
+
+    const res = await fetch(this.hfUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.hfApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: texts,
+        options: { wait_for_model: true },
+      }),
     });
 
-    const vectors = out.tolist();
-    return vectors.map((v) => this.l2Normalize(v));
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new InternalServerErrorException(
+        `HuggingFace API error: ${res.status} ${res.statusText}${text ? ` — ${text}` : ''}`,
+      );
+    }
+
+    // HF feature-extraction returns 3D [batch, seq_len, hidden] or 2D [batch, hidden]
+    const data = (await res.json()) as number[][][] | number[][];
+
+    return (data as Array<number[] | number[][]>).map((item) => {
+      if (Array.isArray(item[0])) {
+        return this.l2Normalize(this.meanPool(item as number[][]));
+      }
+      return this.l2Normalize(item as number[]);
+    });
   }
 
   async embedQuery(query: string): Promise<number[]> {
