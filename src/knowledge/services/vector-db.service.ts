@@ -7,6 +7,8 @@ export type VectorSearchMatch = {
   page: number;
   chunkIndex: number;
   content: string;
+  category: string | null;
+  tags: string[] | null;
   score: number;
   docSource: string;
   docTitle: string | null;
@@ -25,6 +27,8 @@ type MatchRow = {
   page: number;
   chunk_index: number;
   content: string;
+  category: string | null;
+  tags: string[] | null;
   score: number;
   doc_source: string;
   doc_title: string | null;
@@ -34,6 +38,12 @@ type MatchRow = {
 @Injectable()
 export class VectorDbService {
   private readonly pool: Pool;
+  private readonly connectionInfo: {
+    host: string | null;
+    port: number | null;
+    database: string | null;
+    user: string | null;
+  };
 
   constructor() {
     const connectionString = process.env.VECTOR_DATABASE_URL;
@@ -41,11 +51,96 @@ export class VectorDbService {
       throw new Error('VECTOR_DATABASE_URL is required');
     }
 
+    // Safe to expose for debugging (no password).
+    try {
+      const url = new URL(connectionString);
+      const port = url.port ? Number(url.port) : null;
+      this.connectionInfo = {
+        host: url.hostname || null,
+        port: Number.isFinite(port) ? port : null,
+        database: url.pathname?.replace(/^\//, '') || null,
+        user: url.username || null,
+      };
+    } catch {
+      this.connectionInfo = {
+        host: null,
+        port: null,
+        database: null,
+        user: null,
+      };
+    }
+
     this.pool = new Pool({
       connectionString,
       connectionTimeoutMillis: 10_000,
       statement_timeout: 15_000,
     });
+  }
+
+  getDebugConnectionInfo(): {
+    host: string | null;
+    port: number | null;
+    database: string | null;
+    user: string | null;
+  } {
+    return this.connectionInfo;
+  }
+
+  async getStats(): Promise<{
+    documents: number;
+    chunks: number;
+    avgChunkChars: number;
+    topDocuments: Array<{
+      source: string;
+      title: string | null;
+      chunks: number;
+    }>;
+  }> {
+    const docsRes = await this.pool.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM public.knowledge_documents`,
+    );
+    const chunksRes = await this.pool.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM public.knowledge_document_chunks`,
+    );
+    const avgRes = await this.pool.query<{ n: number }>(
+      `SELECT COALESCE(AVG(LENGTH(content)), 0)::int AS n FROM public.knowledge_document_chunks`,
+    );
+    const topRes = await this.pool.query<{
+      source: string;
+      title: string | null;
+      chunks: number;
+    }>(
+      `
+      SELECT d.source, d.title, COUNT(c.id)::int AS chunks
+      FROM public.knowledge_documents d
+      JOIN public.knowledge_document_chunks c ON c.document_id = d.id
+      GROUP BY d.id
+      ORDER BY chunks DESC
+      LIMIT 10;
+      `,
+    );
+
+    return {
+      documents: docsRes.rows[0]?.n ?? 0,
+      chunks: chunksRes.rows[0]?.n ?? 0,
+      avgChunkChars: avgRes.rows[0]?.n ?? 0,
+      topDocuments: topRes.rows,
+    };
+  }
+
+  async getMatchFunctionDefinition(): Promise<string | null> {
+    const res = await this.pool.query<{ def: string }>(
+      `
+      SELECT pg_get_functiondef(p.oid) AS def
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public'
+        AND p.proname = 'match_document_chunks'
+      ORDER BY p.oid DESC
+      LIMIT 1;
+      `,
+    );
+    return res.rows[0]?.def ?? null;
   }
 
   private toVectorLiteral(values: number[]): string {
@@ -118,6 +213,9 @@ export class VectorDbService {
     id: string;
     chunks: number;
     ingestComplete: boolean | null;
+    embeddingProvider?: unknown;
+    embeddingModel?: unknown;
+    embeddingDims?: unknown;
   } | null> {
     const res = await this.pool.query<DocumentStatusRow>(
       `
@@ -144,13 +242,68 @@ export class VectorDbService {
     const ingestComplete =
       typeof ingestValue === 'boolean' ? ingestValue : null;
 
-    return { id: row.id, chunks: row.chunks, ingestComplete };
+    const embeddingProvider = meta ? meta['embeddingProvider'] : undefined;
+    const embeddingModel = meta ? meta['embeddingModel'] : undefined;
+    const embeddingDims = meta ? meta['embeddingDims'] : undefined;
+
+    return {
+      id: row.id,
+      chunks: row.chunks,
+      ingestComplete,
+      embeddingProvider,
+      embeddingModel,
+      embeddingDims,
+    };
   }
 
   async deleteChunksByDocumentId(documentId: string): Promise<void> {
     await this.pool.query(
       `DELETE FROM public.knowledge_document_chunks WHERE document_id = $1`,
       [documentId],
+    );
+  }
+
+  async pruneChunksByPageCounts(params: {
+    documentId: string;
+    pagesCount: number;
+    chunksPerPage: number[]; // 1-indexed pages: chunksPerPage[0] => page 1
+  }): Promise<void> {
+    const { documentId, pagesCount, chunksPerPage } = params;
+    if (pagesCount <= 0) return;
+    if (chunksPerPage.length !== pagesCount) {
+      throw new InternalServerErrorException(
+        `Invalid chunksPerPage length. Expected ${pagesCount}, got ${chunksPerPage.length}`,
+      );
+    }
+
+    const pages = Array.from({ length: pagesCount }, (_, i) => i + 1);
+    const keepCounts = chunksPerPage.map((n) => Math.max(0, Math.floor(n)));
+
+    // Delete chunks that are outside the current (page, chunk_index) range.
+    // This makes re-ingestion resilient: we upsert/update first, then prune.
+    await this.pool.query(
+      `
+      WITH target(page, keep_chunks) AS (
+        SELECT *
+        FROM unnest($2::int[], $3::int[])
+      )
+      DELETE FROM public.knowledge_document_chunks c
+      USING target t
+      WHERE c.document_id = $1
+        AND c.page = t.page
+        AND c.chunk_index >= t.keep_chunks;
+      `,
+      [documentId, pages, keepCounts],
+    );
+
+    // Also prune pages that no longer exist.
+    await this.pool.query(
+      `
+      DELETE FROM public.knowledge_document_chunks
+      WHERE document_id = $1
+        AND page > $2;
+      `,
+      [documentId, pagesCount],
     );
   }
 
@@ -180,19 +333,20 @@ export class VectorDbService {
       chunkIndex: number;
       content: string;
       embedding: number[];
+      category?: string;
+      tags?: string[];
     }>,
   ): Promise<void> {
     if (chunks.length === 0) return;
 
-    // Use multi-row INSERT. Keep batch size reasonable to avoid huge payloads.
     const values: any[] = [];
     const rowsSql: string[] = [];
 
     for (let i = 0; i < chunks.length; i++) {
       const c = chunks[i];
-      const base = i * 5;
+      const base = i * 7;
       rowsSql.push(
-        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}::extensions.vector)`,
+        `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}::extensions.vector, $${base + 6}, $${base + 7}::text[])`,
       );
       values.push(
         c.documentId,
@@ -200,16 +354,22 @@ export class VectorDbService {
         c.chunkIndex,
         c.content,
         this.toVectorLiteral(c.embedding),
+        c.category || null,
+        c.tags || [],
       );
     }
 
     await this.pool.query(
       `
       INSERT INTO public.knowledge_document_chunks
-        (document_id, page, chunk_index, content, embedding)
+        (document_id, page, chunk_index, content, embedding, category, tags)
       VALUES ${rowsSql.join(',')}
       ON CONFLICT (document_id, page, chunk_index)
-      DO UPDATE SET content = EXCLUDED.content, embedding = EXCLUDED.embedding;
+      DO UPDATE SET 
+        content = EXCLUDED.content, 
+        embedding = EXCLUDED.embedding,
+        category = EXCLUDED.category,
+        tags = EXCLUDED.tags;
       `,
       values,
     );
@@ -234,6 +394,8 @@ export class VectorDbService {
       page: r.page,
       chunkIndex: r.chunk_index,
       content: r.content,
+      category: r.category,
+      tags: r.tags,
       score: Number(r.score),
       docSource: r.doc_source,
       docTitle: r.doc_title,
