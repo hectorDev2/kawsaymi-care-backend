@@ -30,6 +30,21 @@ export class HealthService {
     return { health };
   }
 
+  async updateHeight(userId: string, height: number) {
+    const existing = await this.prisma.healthData.findUnique({
+      where: { userId },
+    });
+    const imc = this.calculateImc(existing?.weight ?? null, height);
+
+    const health = await this.prisma.healthData.upsert({
+      where: { userId },
+      update: { height, imc },
+      create: { userId, height, imc },
+    });
+
+    return { health };
+  }
+
   async updateProfile(userId: string, dto: UpdateHealthProfileDto) {
     const existing = await this.prisma.healthData.findUnique({
       where: { userId },

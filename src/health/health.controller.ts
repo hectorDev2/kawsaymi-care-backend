@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { HealthService } from './health.service';
 import { UpdateWeightDto } from './dto/update-weight.dto';
+import { UpdateHeightDto } from './dto/update-height.dto';
 import { UpdateHealthProfileDto } from './dto/update-health-profile.dto';
 
 @ApiTags('Health')
@@ -38,6 +39,15 @@ export class HealthController {
   @Post('weight')
   updateWeight(@GetUser() user: User, @Body() dto: UpdateWeightDto) {
     return this.healthService.updateWeight(user.id, dto.weight);
+  }
+
+  @ApiOperation({
+    summary:
+      'Registrar altura en cm — recalcula IMC automáticamente si hay peso',
+  })
+  @Post('height')
+  updateHeight(@GetUser() user: User, @Body() dto: UpdateHeightDto) {
+    return this.healthService.updateHeight(user.id, dto.height);
   }
 
   @ApiOperation({
