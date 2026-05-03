@@ -161,7 +161,9 @@ Migration aplicada: `20260414114558_init`
 | Método | Ruta |
 |---|---|
 | GET | `/health/profile` |
+| PUT | `/health/profile` |
 | POST | `/health/weight` |
+| POST | `/health/height` |
 | GET | `/health/imc` |
 | GET | `/health/polypharmacy` |
 
