@@ -17,7 +17,7 @@ export class IngestService {
     private readonly vectorDb: VectorDbService,
   ) {}
 
-  async ingestLocalFolder(): Promise<{
+  async ingestLocalFolder(force = false): Promise<{
     folder: string;
     processed: number;
     documents: Array<{ source: string; documentId: string; chunks: number }>;
@@ -42,11 +42,10 @@ export class IngestService {
       const filePath = path.join(this.folderPath, fileName);
       const source = `local:${fileName}`;
 
-      // Idempotency: if the document already exists and has chunks, skip it.
-      // If it exists but has 0 chunks (previous ingest interrupted), re-process.
       const existing = await this.vectorDb.getDocumentStatusBySource(source);
       if (existing && existing.chunks > 0) {
-        continue;
+        if (!force) continue;
+        await this.vectorDb.deleteChunksByDocumentId(existing.id);
       }
 
       const pages = await this.pdf.extractPagesFromFile(filePath);
@@ -77,7 +76,7 @@ export class IngestService {
         await this.vectorDb.getExistingChunkKeysByDocumentId(documentId);
 
       // Embed missing chunks in batches.
-      const batchSize = 32;
+      const batchSize = 5;
       let inserted = 0;
       const missing = chunks.filter(
         (c) => !existingKeys.has(`${c.page}:${c.chunkIndex}`),
@@ -99,6 +98,10 @@ export class IngestService {
           })),
         );
         inserted += batch.length;
+
+        if (i + batchSize < missing.length) {
+          await new Promise((r) => setTimeout(r, 4000));
+        }
       }
 
       // Mark as complete (used for future idempotency checks / debugging).

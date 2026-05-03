@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpException,
   InternalServerErrorException,
   Post,
@@ -52,14 +53,15 @@ export class KnowledgeController {
   ) {}
 
   @ApiOperation({
-    summary: 'Ingesta PDFs desde ./pdfs_descargados (ADMIN)',
+    summary: 'Ingesta PDFs desde ./pdfs_descargados (ADMIN). ?force=true re-embedea aunque ya existan chunks.',
   })
   @ApiBearerAuth()
+  @ApiQuery({ name: 'force', required: false, description: 'Re-embed existing documents' })
   @Post('documents')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  async ingestLocalFolder() {
-    const result = await this.ingest.ingestLocalFolder();
+  async ingestLocalFolder(@Query('force') force?: string) {
+    const result = await this.ingest.ingestLocalFolder(force === 'true');
     return result;
   }
 
@@ -87,6 +89,7 @@ export class KnowledgeController {
   @ApiOperation({ summary: 'RAG answer using Groq (auth)' })
   @ApiBearerAuth()
   @Post('answer')
+  @HttpCode(200)
   @UseGuards(JwtAuthGuard)
   async answer(
     @Body() dto: KnowledgeAnswerDto,
