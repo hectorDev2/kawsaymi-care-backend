@@ -239,7 +239,9 @@ El `access_token` se obtiene desde `POST /auth/login`.
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/health/profile` | Perfil de salud — crea vacío si no existe |
+| PUT | `/health/profile` | Actualizar perfil de salud (peso/altura) — recalcula IMC |
 | POST | `/health/weight` | Registrar peso en kg — recalcula IMC automáticamente |
+| POST | `/health/height` | Registrar altura en cm — recalcula IMC automáticamente |
 | GET | `/health/imc` | Obtener IMC calculado |
 | GET | `/health/polypharmacy` | Detectar polifarmacia (true si 5+ medicamentos activos) |
 
