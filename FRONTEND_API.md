@@ -351,6 +351,20 @@ Response:
 { "health": { "weight": 70, "imc": null } }
 ```
 
+### POST /health/height
+
+Body:
+
+```json
+{ "height": 170 }
+```
+
+Response:
+
+```json
+{ "health": { "height": 170, "imc": null } }
+```
+
 ### GET /health/imc
 
 Response:
