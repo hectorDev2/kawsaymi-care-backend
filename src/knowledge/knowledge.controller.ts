@@ -24,6 +24,7 @@ import { IngestService } from './services/ingest.service';
 import { EmbeddingsService } from './services/embeddings.service';
 import { VectorDbService } from './services/vector-db.service';
 import { KnowledgeAnswerDto } from './dto/answer.dto';
+import { KnowledgeSuggestionDto } from './dto/suggestion.dto';
 import { GroqService } from './services/groq.service';
 import { VectorSearchMatch } from './services/vector-db.service';
 
@@ -40,6 +41,41 @@ type KnowledgeAnswerResponse = {
   scoreMin: number;
   matches?: VectorSearchMatch[];
   rawMatches?: VectorSearchMatch[];
+  debugInfo?: {
+    vectorDb?: {
+      host: string | null;
+      port: number | null;
+      database: string | null;
+      user: string | null;
+    };
+    stats?: {
+      documents: number;
+      chunks: number;
+      avgChunkChars: number;
+      topDocuments: Array<{
+        source: string;
+        title: string | null;
+        chunks: number;
+      }>;
+    };
+    rpc?: {
+      matchDocumentChunksDef: string | null;
+    };
+    retrieval?: {
+      rawCount: number;
+      filteredCount: number;
+      filterReasons: {
+        tooLowScore: number;
+        tooShort: number;
+        references: number;
+        tooManyUrls: number;
+        tooManyDigits: number;
+        kept: number;
+      };
+      minScore: number | null;
+      maxScore: number | null;
+    };
+  };
 };
 
 @ApiTags('Knowledge')
@@ -53,16 +89,82 @@ export class KnowledgeController {
   ) {}
 
   @ApiOperation({
-    summary: 'Ingesta PDFs desde ./pdfs_descargados (ADMIN). ?force=true re-embedea aunque ya existan chunks.',
+    summary:
+      'Ingesta PDFs desde ./pdfs_descargados (ADMIN). ?force=true re-embedea aunque ya existan chunks.',
   })
   @ApiBearerAuth()
-  @ApiQuery({ name: 'force', required: false, description: 'Re-embed existing documents' })
+  @ApiQuery({
+    name: 'force',
+    required: false,
+    description: 'Re-embed existing documents',
+  })
   @Post('documents')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   async ingestLocalFolder(@Query('force') force?: string) {
     const result = await this.ingest.ingestLocalFolder(force === 'true');
     return result;
+  }
+
+  @ApiOperation({ summary: 'AI suggestion from knowledge base (auth)' })
+  @ApiBearerAuth()
+  @Post('suggestion')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  async suggestion(
+    @Body() dto: KnowledgeSuggestionDto,
+  ): Promise<{ suggestion: string; sources: string[] }> {
+    try {
+      const q = dto.q?.trim();
+      if (!q) throw new BadRequestException('q is required');
+
+      const k = dto.k ?? 3;
+      const scoreMin = dto.scoreMin ?? 0.75;
+
+      const embedding = await this.embeddings.embedQuery(q);
+      const rawMatches = await this.vectorDb.matchDocumentChunks(
+        embedding,
+        k * 3,
+      );
+
+      const filtered = rawMatches
+        .filter(
+          (m) => m.score >= scoreMin && (m.content ?? '').trim().length >= 80,
+        )
+        .slice(0, k);
+
+      if (filtered.length === 0) {
+        return {
+          suggestion:
+            'No tengo información suficiente en la base de conocimiento para responder esta consulta.',
+          sources: [],
+        };
+      }
+
+      const context = filtered
+        .map((m, i) => `[S${i + 1}]\n${m.content}`)
+        .join('\n\n');
+
+      const suggestion = await this.groq.generateSuggestion({
+        question: q,
+        context,
+      });
+
+      const sources = [
+        ...new Set(
+          filtered.map((m) => m.docTitle ?? m.docSource.replace(/^local:/, '')),
+        ),
+      ];
+
+      return { suggestion, sources };
+    } catch (e) {
+      if (e instanceof HttpException) throw e;
+      throw new InternalServerErrorException(
+        e instanceof Error
+          ? e.message
+          : 'Unexpected error in /knowledge/suggestion',
+      );
+    }
   }
 
   @ApiOperation({ summary: 'Semantic search (auth)' })
@@ -86,6 +188,14 @@ export class KnowledgeController {
     return { matches };
   }
 
+  @ApiOperation({ summary: 'Active embedding provider info (auth)' })
+  @ApiBearerAuth()
+  @Get('embedder')
+  @UseGuards(JwtAuthGuard)
+  getEmbedderInfo() {
+    return this.embeddings.getInfo();
+  }
+
   @ApiOperation({ summary: 'RAG answer using Groq (auth)' })
   @ApiBearerAuth()
   @Post('answer')
@@ -100,8 +210,8 @@ export class KnowledgeController {
         throw new BadRequestException('q is required');
       }
 
-      const k = dto.k ?? 10;
-      const scoreMin = dto.scoreMin ?? 0.7;
+      const k = dto.k ?? 6;
+      const scoreMin = dto.scoreMin ?? 0.8;
       const debug = dto.debug === true;
 
       const embedding = await this.embeddings.embedQuery(q);
@@ -111,10 +221,33 @@ export class KnowledgeController {
         Math.min(50, k * 3),
       );
 
-      const filtered = rawMatches.filter((m) => {
-        if (m.score < scoreMin) return false;
+      const reasons = {
+        tooLowScore: 0,
+        tooShort: 0,
+        references: 0,
+        tooManyUrls: 0,
+        tooManyDigits: 0,
+        kept: 0,
+      };
+
+      let minScore: number | null = null;
+      let maxScore: number | null = null;
+
+      const filtered: VectorSearchMatch[] = [];
+      for (const m of rawMatches) {
+        if (minScore === null || m.score < minScore) minScore = m.score;
+        if (maxScore === null || m.score > maxScore) maxScore = m.score;
+
+        if (m.score < scoreMin) {
+          reasons.tooLowScore++;
+          continue;
+        }
+
         const text = (m.content ?? '').trim();
-        if (text.length < 80) return false;
+        if (text.length < 80) {
+          reasons.tooShort++;
+          continue;
+        }
 
         const lower = text.toLowerCase();
         if (
@@ -122,17 +255,25 @@ export class KnowledgeController {
           lower.includes('referenc') ||
           lower.includes('references')
         ) {
-          return false;
+          reasons.references++;
+          continue;
         }
 
         const urls = (text.match(/https?:\/\//g) ?? []).length;
-        if (urls >= 2) return false;
+        if (urls >= 2) {
+          reasons.tooManyUrls++;
+          continue;
+        }
 
         const digits = (text.match(/[0-9]/g) ?? []).length;
-        if (digits / Math.max(1, text.length) > 0.25) return false;
+        if (digits / Math.max(1, text.length) > 0.25) {
+          reasons.tooManyDigits++;
+          continue;
+        }
 
-        return true;
-      });
+        reasons.kept++;
+        filtered.push(m);
+      }
 
       const matches = filtered.slice(0, k);
 
@@ -146,6 +287,21 @@ export class KnowledgeController {
         if (debug) {
           base.matches = [];
           base.rawMatches = rawMatches;
+          base.debugInfo = {
+            vectorDb: this.vectorDb.getDebugConnectionInfo(),
+            stats: await this.vectorDb.getStats(),
+            rpc: {
+              matchDocumentChunksDef:
+                await this.vectorDb.getMatchFunctionDefinition(),
+            },
+            retrieval: {
+              rawCount: rawMatches.length,
+              filteredCount: filtered.length,
+              filterReasons: reasons,
+              minScore,
+              maxScore,
+            },
+          };
         }
         return base;
       }
@@ -179,12 +335,29 @@ export class KnowledgeController {
       if (debug) {
         base.matches = matches;
         base.rawMatches = rawMatches;
+        base.debugInfo = {
+          vectorDb: this.vectorDb.getDebugConnectionInfo(),
+          stats: await this.vectorDb.getStats(),
+          rpc: {
+            matchDocumentChunksDef:
+              await this.vectorDb.getMatchFunctionDefinition(),
+          },
+          retrieval: {
+            rawCount: rawMatches.length,
+            filteredCount: filtered.length,
+            filterReasons: reasons,
+            minScore,
+            maxScore,
+          },
+        };
       }
       return base;
     } catch (e) {
       if (e instanceof HttpException) throw e;
       throw new InternalServerErrorException(
-        e instanceof Error ? e.message : 'Unexpected error in /knowledge/answer',
+        e instanceof Error
+          ? e.message
+          : 'Unexpected error in /knowledge/answer',
       );
     }
   }
