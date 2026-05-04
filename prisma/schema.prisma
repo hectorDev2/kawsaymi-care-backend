@@ -19,8 +19,13 @@ model User {
   location    String?
   language    String   @default("es")
   timezone    String   @default("UTC")
-  allergies   String[]
-  conditions  String[]
+  allergies       String[]
+  conditions      String[]
+  bloodType       String?
+  surgeries       String?
+  hospitalizations String?
+  transfusions    Boolean?
+  vaccines        String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

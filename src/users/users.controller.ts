@@ -7,6 +7,7 @@ import { UsersService } from './users.service';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { UpdateAllergiesDto } from './dto/update-allergies.dto';
 import { UpdateConditionsDto } from './dto/update-conditions.dto';
+import { UpdateMedicalBackgroundDto } from './dto/update-medical-background.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -40,6 +41,15 @@ export class UsersController {
   @Put('me/conditions')
   updateConditions(@GetUser() user: User, @Body() dto: UpdateConditionsDto) {
     return this.usersService.updateConditions(user.id, dto.conditions);
+  }
+
+  @ApiOperation({ summary: 'Actualizar antecedentes médicos completos' })
+  @Put('me/medical-background')
+  updateMedicalBackground(
+    @GetUser() user: User,
+    @Body() dto: UpdateMedicalBackgroundDto,
+  ) {
+    return this.usersService.updateMedicalBackground(user.id, dto);
   }
 
   @ApiOperation({ summary: 'Eliminar cuenta y todos los datos asociados' })
