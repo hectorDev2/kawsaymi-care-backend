@@ -1,6 +1,6 @@
 # dependencies
 /node_modules
-
+.opencode
 # logs
 logs
 *.log
