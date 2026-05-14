@@ -1,7 +1,11 @@
-import { Body, Controller, Get, Post, Put, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Body, Controller, Get, Post, Put } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import type { User } from '@prisma/client';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { HealthService } from './health.service';
 import { UpdateWeightDto } from './dto/update-weight.dto';
@@ -11,13 +15,14 @@ import { UpdateHealthProfileDto } from './dto/update-health-profile.dto';
 @ApiTags('Health')
 @ApiBearerAuth()
 @Controller('health')
-@UseGuards(JwtAuthGuard)
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
   @ApiOperation({
     summary: 'Obtener perfil de salud — crea uno vacío si no existe',
   })
+  @ApiResponse({ status: 200, description: 'Perfil de salud' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @Get('profile')
   profile(@GetUser() user: User) {
     return this.healthService.profile(user.id);
@@ -27,6 +32,9 @@ export class HealthController {
     summary:
       'Actualizar perfil de salud (peso/altura) — recalcula IMC cuando ambos existen',
   })
+  @ApiResponse({ status: 200, description: 'Perfil actualizado' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @Put('profile')
   updateProfile(@GetUser() user: User, @Body() dto: UpdateHealthProfileDto) {
     return this.healthService.updateProfile(user.id, dto);
@@ -36,6 +44,9 @@ export class HealthController {
     summary:
       'Registrar peso en kg — recalcula IMC automáticamente si hay talla',
   })
+  @ApiResponse({ status: 201, description: 'Peso registrado' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @Post('weight')
   updateWeight(@GetUser() user: User, @Body() dto: UpdateWeightDto) {
     return this.healthService.updateWeight(user.id, dto.weight);
@@ -45,6 +56,9 @@ export class HealthController {
     summary:
       'Registrar altura en cm — recalcula IMC automáticamente si hay peso',
   })
+  @ApiResponse({ status: 201, description: 'Altura registrada' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @Post('height')
   updateHeight(@GetUser() user: User, @Body() dto: UpdateHeightDto) {
     return this.healthService.updateHeight(user.id, dto.height);
@@ -53,6 +67,8 @@ export class HealthController {
   @ApiOperation({
     summary: 'Obtener IMC calculado — requiere tener peso y talla registrados',
   })
+  @ApiResponse({ status: 200, description: 'IMC calculado' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @Get('imc')
   imc(@GetUser() user: User) {
     return this.healthService.imc(user.id);
@@ -62,6 +78,8 @@ export class HealthController {
     summary:
       'Detectar polifarmacia — true si el usuario tiene 5 o más medicamentos activos',
   })
+  @ApiResponse({ status: 200, description: 'Resultado de polifarmacia' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @Get('polypharmacy')
   polypharmacy(@GetUser() user: User) {
     return this.healthService.polypharmacy(user.id);

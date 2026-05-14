@@ -14,9 +14,9 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiQuery,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '@prisma/client';
@@ -92,6 +92,9 @@ export class KnowledgeController {
     summary:
       'Ingesta PDFs desde ./pdfs_descargados (ADMIN). ?force=true re-embedea aunque ya existan chunks.',
   })
+  @ApiResponse({ status: 201, description: 'PDFs ingestados exitosamente' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 403, description: 'Requiere rol ADMIN' })
   @ApiBearerAuth()
   @ApiQuery({
     name: 'force',
@@ -99,7 +102,7 @@ export class KnowledgeController {
     description: 'Re-embed existing documents',
   })
   @Post('documents')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   async ingestLocalFolder(@Query('force') force?: string) {
     const result = await this.ingest.ingestLocalFolder(force === 'true');
@@ -107,10 +110,12 @@ export class KnowledgeController {
   }
 
   @ApiOperation({ summary: 'AI suggestion from knowledge base (auth)' })
+  @ApiResponse({ status: 200, description: 'Sugerencia generada' })
+  @ApiResponse({ status: 400, description: 'Consulta vacía' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiBearerAuth()
   @Post('suggestion')
   @HttpCode(200)
-  @UseGuards(JwtAuthGuard)
   async suggestion(
     @Body() dto: KnowledgeSuggestionDto,
   ): Promise<{ suggestion: string; sources: string[] }> {
@@ -168,11 +173,13 @@ export class KnowledgeController {
   }
 
   @ApiOperation({ summary: 'Semantic search (auth)' })
+  @ApiResponse({ status: 200, description: 'Resultados de búsqueda' })
+  @ApiResponse({ status: 400, description: 'Query requerida' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiBearerAuth()
   @ApiQuery({ name: 'q', required: true })
   @ApiQuery({ name: 'k', required: false, description: 'Top K (default 10)' })
   @Get('search')
-  @UseGuards(JwtAuthGuard)
   async search(@Query('q') q: string, @Query('k') k?: string) {
     if (!q || q.trim().length === 0) {
       throw new BadRequestException('q is required');
@@ -189,18 +196,21 @@ export class KnowledgeController {
   }
 
   @ApiOperation({ summary: 'Active embedding provider info (auth)' })
+  @ApiResponse({ status: 200, description: 'Info del proveedor de embeddings' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiBearerAuth()
   @Get('embedder')
-  @UseGuards(JwtAuthGuard)
   getEmbedderInfo() {
     return this.embeddings.getInfo();
   }
 
   @ApiOperation({ summary: 'RAG answer using Groq (auth)' })
+  @ApiResponse({ status: 200, description: 'Respuesta generada con fuentes' })
+  @ApiResponse({ status: 400, description: 'Consulta vacía' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiBearerAuth()
   @Post('answer')
   @HttpCode(200)
-  @UseGuards(JwtAuthGuard)
   async answer(
     @Body() dto: KnowledgeAnswerDto,
   ): Promise<KnowledgeAnswerResponse> {

@@ -4,16 +4,15 @@ import {
   Param,
   Patch,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
   ApiQuery,
+  ApiResponse,
 } from '@nestjs/swagger';
 import type { User } from '@prisma/client';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { EventsService } from './events.service';
 import { EventsRangeQueryDto } from './dto/events-range-query.dto';
@@ -21,7 +20,6 @@ import { EventsRangeQueryDto } from './dto/events-range-query.dto';
 @ApiTags('Events')
 @ApiBearerAuth()
 @Controller('events')
-@UseGuards(JwtAuthGuard)
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
@@ -29,6 +27,8 @@ export class EventsController {
     summary:
       'Listar eventos con filtros opcionales de fecha, medicamento y estado',
   })
+  @ApiResponse({ status: 200, description: 'Lista de eventos' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @ApiQuery({
     name: 'from',
     required: false,
@@ -53,6 +53,8 @@ export class EventsController {
   @ApiOperation({
     summary: 'Eventos de hoy — genera automáticamente si no existen',
   })
+  @ApiResponse({ status: 200, description: 'Eventos de hoy' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @Get('today')
   today(@GetUser() user: User) {
     return this.eventsService.today(user.id);
@@ -62,18 +64,26 @@ export class EventsController {
     summary:
       'Eventos de la semana actual — genera automáticamente si no existen',
   })
+  @ApiResponse({ status: 200, description: 'Eventos de la semana' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
   @Get('week')
   week(@GetUser() user: User) {
     return this.eventsService.week(user.id);
   }
 
   @ApiOperation({ summary: 'Marcar evento como tomado' })
+  @ApiResponse({ status: 200, description: 'Evento marcado como tomado' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 404, description: 'Evento no encontrado' })
   @Patch(':id/mark-taken')
   markTaken(@GetUser() user: User, @Param('id') id: string) {
     return this.eventsService.mark(user.id, id, 'TAKEN');
   }
 
   @ApiOperation({ summary: 'Marcar evento como omitido' })
+  @ApiResponse({ status: 200, description: 'Evento marcado como omitido' })
+  @ApiResponse({ status: 401, description: 'No autenticado' })
+  @ApiResponse({ status: 404, description: 'Evento no encontrado' })
   @Patch(':id/mark-missed')
   markMissed(@GetUser() user: User, @Param('id') id: string) {
     return this.eventsService.mark(user.id, id, 'MISSED');
