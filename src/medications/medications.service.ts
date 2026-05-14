@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { MedStatus } from '@prisma/client';
+import { EventStatus, MedStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMedicationDto } from './dto/create-medication.dto';
 import { UpdateMedicationDto } from './dto/update-medication.dto';
@@ -36,28 +36,68 @@ export class MedicationsService {
         startDate: new Date(dto.startDate),
         endDate: dto.endDate ? new Date(dto.endDate) : null,
         schedule: dto.schedule,
+        events: {
+          createMany: {
+            data: dto.schedule.map((iso) => ({
+              userId,
+              dateTimeScheduled: new Date(iso),
+              status: 'PENDING' as EventStatus,
+            })),
+          },
+        },
+      },
+      include: {
+        events: {
+          orderBy: { dateTimeScheduled: 'asc' },
+          select: { id: true, dateTimeScheduled: true, status: true },
+        },
       },
     });
     return { medication };
   }
 
   async update(userId: string, id: string, dto: UpdateMedicationDto) {
-    // Ensure ownership and existence.
     await this.get(userId, id);
 
-    const medication = await this.prisma.medication.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        dose: dto.dose,
-        frequency: dto.frequency,
-        intervalHours: dto.intervalHours,
-        instructions: dto.instructions,
-        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
-        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
-        schedule: dto.schedule,
-      },
+    const medication = await this.prisma.$transaction(async (tx) => {
+      await tx.medicationEvent.deleteMany({ where: { medicationId: id } });
+
+      const updated = await tx.medication.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          dose: dto.dose,
+          frequency: dto.frequency,
+          intervalHours: dto.intervalHours,
+          instructions: dto.instructions,
+          startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+          endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+          schedule: dto.schedule,
+        },
+      });
+
+      if (dto.schedule && dto.schedule.length > 0) {
+        await tx.medicationEvent.createMany({
+          data: dto.schedule.map((iso) => ({
+            userId,
+            medicationId: id,
+            dateTimeScheduled: new Date(iso),
+            status: 'PENDING' as EventStatus,
+          })),
+        });
+      }
+
+      return tx.medication.findUnique({
+        where: { id },
+        include: {
+          events: {
+            orderBy: { dateTimeScheduled: 'asc' },
+            select: { id: true, dateTimeScheduled: true, status: true },
+          },
+        },
+      });
     });
+
     return { medication };
   }
 
@@ -72,6 +112,7 @@ export class MedicationsService {
 
   async remove(userId: string, id: string) {
     await this.get(userId, id);
+    await this.prisma.medicationEvent.deleteMany({ where: { medicationId: id } });
     await this.prisma.medication.delete({ where: { id } });
     return { success: true };
   }
